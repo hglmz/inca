@@ -1,0 +1,16 @@
+// @name Velvet
+// @description Burgundy velvet: a rough fabric standardSurface whose sheen layer glows at grazing angles.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n velvet`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 0.3 0.02 0.07;
+setAttr ($m + ".metalness") 0;
+setAttr ($m + ".specular") 0.2;
+setAttr ($m + ".specularRoughness") 0.8;
+setAttr ($m + ".sheen") 1;
+setAttr ($m + ".sheenColor") -type double3 0.95 0.45 0.6;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

@@ -1,0 +1,17 @@
+// @name Glass
+// @description Clear glass: a fully transmissive standardSurface with IOR 1.5 and smooth refraction.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n glass`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 1 1 1;
+setAttr ($m + ".metalness") 0;
+setAttr ($m + ".specular") 1;
+setAttr ($m + ".specularRoughness") 0;
+setAttr ($m + ".specularIOR") 1.5;
+setAttr ($m + ".transmission") 1;
+setAttr ($m + ".transmissionColor") -type double3 1 1 1;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

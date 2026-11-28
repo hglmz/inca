@@ -1,0 +1,16 @@
+// @name Car Paint
+// @description Deep blue car paint: a slightly metallic base under a clear, glossy coat layer.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n carPaint`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 0.04 0.1 0.42;
+setAttr ($m + ".metalness") 0.35;
+setAttr ($m + ".specular") 1;
+setAttr ($m + ".specularRoughness") 0.35;
+setAttr ($m + ".coat") 1;
+setAttr ($m + ".coatRoughness") 0.02;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

@@ -1,0 +1,15 @@
+// @name Rubber
+// @description Black rubber: a dark, rough dielectric standardSurface with a dull, wide highlight.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n rubber`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 0.03 0.03 0.03;
+setAttr ($m + ".metalness") 0;
+setAttr ($m + ".specular") 0.5;
+setAttr ($m + ".specularRoughness") 0.75;
+setAttr ($m + ".specularIOR") 1.5;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

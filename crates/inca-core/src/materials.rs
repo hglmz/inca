@@ -915,10 +915,41 @@ pub fn swatch(m: &Material, color_tex: Option<&Texture>, place: Option<&Params>,
             let h = (light + glam::Vec3::Z).normalize();
             let shin = 2.0 / (p.roughness.max(0.02) * p.roughness.max(0.02)) - 2.0;
             let spec = if p.unlit { 0.0 } else { p.specular * n.dot(h).max(0.0).powf(shin.max(1.0)) * (shin + 8.0) / 25.0 };
-            let kd = if p.unlit { 1.0 } else { diff * (1.0 - p.metalness) };
+            let transmission = p.transmission.clamp(0.0, 1.0);
+            let kd = if p.unlit { 1.0 } else { diff * (1.0 - p.metalness) * (1.0 - transmission) };
             let sc = [1.0 - p.metalness + p.metalness * base[0], 1.0 - p.metalness + p.metalness * base[1], 1.0 - p.metalness + p.metalness * base[2]];
+            // A small studio environment for reflections (a soft box above left, a bright sky
+            // fading to a dark floor), so metals, coats and glass read as what they are
+            // instead of black.
+            let ndv = n.z.max(0.0);
+            let refl_dir = n * (2.0 * ndv) - glam::Vec3::Z;
+            let env = |rough: f32| {
+                let sky = 0.06 + 0.8 * (refl_dir.y * 0.5 + 0.5).powi(2);
+                let box_dir = glam::Vec3::new(-0.45, 0.7, 0.55).normalize();
+                let spread = 0.06 + rough * rough * 1.5;
+                let soft_box = (-(refl_dir - box_dir).length_squared() / spread).exp() * 3.0 * (1.0 - rough * 0.8);
+                (sky + soft_box) * (1.0 - rough * 0.5) + 0.3 * rough * 0.5
+            };
+            let fresnel = (1.0 - ndv).powi(5);
+            let e = env(p.roughness.clamp(0.0, 1.0));
+            let e_coat = env(p.coat_roughness.clamp(0.0, 1.0));
+            // glass: the dark background seen through the sphere, bent and tinted
+            let behind = {
+                let bx = (x as f32 - n.x * size as f32 * 0.18).clamp(0.0, size as f32 - 1.0) as usize;
+                let by = (y as f32 + n.y * size as f32 * 0.18).clamp(0.0, size as f32 - 1.0) as usize;
+                if ((bx * 8 / size) + (by * 8 / size)) % 2 == 0 { 0.05 } else { 0.09 }
+            };
             let c: Vec<u8> = (0..3).map(|i| {
-                let lit = base[i] * kd + spec * sc[i] * 0.6 + p.emission[i];
+                let mut lit = base[i] * kd + spec * sc[i] * 0.6 + p.emission[i];
+                if !p.unlit {
+                    let dielectric = 0.04 * p.specular.clamp(0.0, 1.0) * p.spec_color[i].min(2.0);
+                    let f0 = dielectric * (1.0 - p.metalness) + base[i] * p.metalness;
+                    let f = f0 + (p.specular.clamp(0.0, 1.0).max(p.metalness) - f0).max(0.0) * fresnel;
+                    lit += f * e;
+                    lit += transmission * (1.0 - f) * (behind + 0.25 * diff) * base[i];
+                    lit += p.coat * (0.04 + 0.96 * fresnel) * e_coat;
+                    lit += p.sheen * p.sheen_color[i] * (1.0 - ndv).powi(2) * diff * 0.8;
+                }
                 enc(lit * p.opacity + bg * (1.0 - p.opacity))
             }).collect();
             out.extend_from_slice(&[c[0], c[1], c[2], 255]);

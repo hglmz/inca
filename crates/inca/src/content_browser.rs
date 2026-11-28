@@ -738,6 +738,27 @@ fn path_trace(s: &inca_core::scene::Scene, camera: &str, px: u32, samples: u32) 
     (px, px, rs.resolve(&acc, samples))
 }
 
+/// Edge of a material preset's live swatch.
+const SWATCH_PX: usize = 160;
+
+/// A material preset drawn as a lit ball (the Hypershade swatch): its MEL runs in a throwaway
+/// scene and the material it makes is shaded on the CPU, so no render is needed.
+pub fn material_swatch(e: &Example, px: usize) -> Option<Pixels> {
+    if e.kind != ExampleKind::Material {
+        return None;
+    }
+    let mut s = inca_core::scene::Scene::new();
+    let before: HashSet<String> = s.material_ids().into_iter().collect();
+    let mut mel = inca_core::mel::Interp::new();
+    mel.run(&mut s, &mut inca_core::commands::NoHost, e.scene_part()).ok()?;
+    let id = s.material_ids().into_iter().rev().find(|m| !before.contains(m))?;
+    let m = s.material(&id)?;
+    let tex = m.maps.get(m.color_attr()).and_then(|t| t.as_str()).and_then(|t| s.texture(t));
+    let place = tex.as_ref().and_then(|t| s.place_of(t));
+    let rgba = inca_core::materials::swatch(&m, tex.as_ref(), place.as_ref().map(|p| &p.attrs), px);
+    Some((px as u32, px as u32, rgba))
+}
+
 impl CbState {
     /// The thumbnail of an item, if there is one yet (user files render in the background).
     fn thumbnail(&mut self, ctx: &egui::Context, item: &Item) -> Option<egui::TextureHandle> {
@@ -751,7 +772,8 @@ impl CbState {
             return None;
         }
         let px = match &item.target {
-            Target::Example(i) => examples()[*i].thumb.and_then(decode_png),
+            // a material preset without a rendered thumbnail gets a live swatch
+            Target::Example(i) => examples()[*i].thumb.and_then(decode_png).or_else(|| material_swatch(&examples()[*i], SWATCH_PX)),
             Target::File(p) => {
                 // the disk cache, else ask the worker
                 match thumb_cache_path(&key).and_then(|c| std::fs::read(c).ok()).and_then(|b| decode_png(&b)) {
@@ -2265,6 +2287,30 @@ select -r $b[0];
         let d = drives();
         assert!(!d.is_empty());
         assert!(d.iter().all(|p| p.is_absolute()));
+    }
+
+    /// Every material preset has a live swatch, and a metal is not drawn black.
+    #[test]
+    fn material_presets_get_live_swatches() {
+        for e in examples().iter().filter(|e| e.kind == ExampleKind::Material) {
+            let (w, h, px) = material_swatch(e, 64).unwrap_or_else(|| panic!("{}: no swatch", e.path));
+            assert_eq!((w, h, px.len()), (64, 64, 64 * 64 * 4));
+            let centre = &px[((32 * 64 + 32) * 4) as usize..][..3];
+            assert!(centre.iter().map(|&c| c as u32).sum::<u32>() > 60, "{}: the ball is black {centre:?}", e.path);
+        }
+    }
+
+    /// Developer tool: write every material preset's swatch to $INCA_SWATCH_DIR (for a look).
+    #[test]
+    #[ignore]
+    fn dump_material_swatches() {
+        let dir = PathBuf::from(std::env::var("INCA_SWATCH_DIR").expect("set INCA_SWATCH_DIR"));
+        std::fs::create_dir_all(&dir).unwrap();
+        for e in examples().iter().filter(|e| e.kind == ExampleKind::Material) {
+            let (w, h, px) = material_swatch(e, 160).unwrap();
+            let name = e.path.rsplit('/').next().unwrap().replace(".mel", ".png");
+            image::save_buffer(dir.join(name), &px, w, h, image::ColorType::Rgba8).unwrap();
+        }
     }
 
     #[test]

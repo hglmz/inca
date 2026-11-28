@@ -1,0 +1,14 @@
+// @name Brushed Aluminium
+// @description Brushed aluminium: a bright, fully metallic standardSurface with a soft, blurry reflection.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n brushedAluminium`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 0.913 0.922 0.924;
+setAttr ($m + ".metalness") 1;
+setAttr ($m + ".specular") 1;
+setAttr ($m + ".specularRoughness") 0.42;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

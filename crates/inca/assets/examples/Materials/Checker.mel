@@ -1,0 +1,23 @@
+// @name Checker
+// @description Grey and white checkerboard: a matte standardSurface with a procedural checker texture on its base colour.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n checkerMat`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".metalness") 0;
+setAttr ($m + ".specular") 0.5;
+setAttr ($m + ".specularRoughness") 0.5;
+string $t = `shadingNode -asTexture checker -n checkerTex`;
+setAttr ($t + ".color1") -type double3 0.8 0.8 0.8;
+setAttr ($t + ".color2") -type double3 0.08 0.08 0.1;
+connectAttr -f ($t + ".outColor") ($m + ".baseColor");
+// 8 x 8 squares per UV tile (the checker draws one square per repeat)
+string $place[] = `listConnections ($t + ".uvCoord")`;
+if (size($place) > 0) {
+    setAttr ($place[0] + ".repeatU") 8;
+    setAttr ($place[0] + ".repeatV") 8;
+}
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

@@ -1,0 +1,14 @@
+// @name Chrome
+// @description Mirror-like chrome: a fully metallic standardSurface with near-zero roughness.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n chrome`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 0.8 0.8 0.82;
+setAttr ($m + ".metalness") 1;
+setAttr ($m + ".specular") 1;
+setAttr ($m + ".specularRoughness") 0.03;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

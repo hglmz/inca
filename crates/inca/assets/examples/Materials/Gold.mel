@@ -1,0 +1,14 @@
+// @name Gold
+// @description Polished yellow gold: a fully metallic standardSurface with a warm reflectance and low roughness.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n gold`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 1 0.766 0.336;
+setAttr ($m + ".metalness") 1;
+setAttr ($m + ".specular") 1;
+setAttr ($m + ".specularRoughness") 0.15;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}

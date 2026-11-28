@@ -1,0 +1,17 @@
+// @name Ceramic
+// @description Glazed white ceramic: a bright diffuse body under a smooth, glossy glaze.
+// @kind material
+string $sel[] = `ls -sl`;
+string $m = `shadingNode -asShader standardSurface -n ceramic`;
+setAttr ($m + ".base") 1;
+setAttr ($m + ".baseColor") -type double3 0.9 0.9 0.88;
+setAttr ($m + ".metalness") 0;
+setAttr ($m + ".specular") 1;
+setAttr ($m + ".specularRoughness") 0.08;
+setAttr ($m + ".specularIOR") 1.5;
+setAttr ($m + ".coat") 1;
+setAttr ($m + ".coatRoughness") 0.02;
+if (size($sel) > 0) {
+    select -r $sel;
+    hyperShade -assign $m;
+}
