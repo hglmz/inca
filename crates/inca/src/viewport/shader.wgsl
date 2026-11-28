@@ -412,6 +412,21 @@ fn max3(c: vec3<f32>) -> f32 {
     return max(c.x, max(c.y, c.z));
 }
 
+// A small studio seen in reflections under Use Default Lighting: a sky gradient that is
+// bright above and dark below, and a soft box up and to the left of the viewer. It turns
+// with the camera, like the default light, so a metal always has something to reflect.
+// Without it, a metal reflects nothing but the light's highlight and shows black.
+fn default_studio_env(r: vec3<f32>, right: vec3<f32>, up: vec3<f32>, toward_viewer: vec3<f32>, rough: f32) -> f32 {
+    let sky = 0.06 + 0.8 * pow(clamp(dot(r, up) * 0.5 + 0.5, 0.0, 1.0), 2.0);
+    let box_dir = normalize(-0.45 * right + 0.7 * up + 0.55 * toward_viewer);
+    let spread = 0.06 + rough * rough * 1.5;
+    let d = r - box_dir;
+    // a rougher surface spreads the box wider and dimmer (about the same energy)
+    let soft_box = exp(-dot(d, d) / spread) * 3.0 * sqrt(0.06 / spread);
+    // rough metals see a blurrier, flatter studio
+    return (sky + soft_box) * (1.0 - rough * 0.5) + 0.15 * rough;
+}
+
 // three.js `D_Charlie` (Production Friendly Microfacet Sheen BRDF).
 fn d_charlie(rough: f32, ndh: f32) -> f32 {
     let alpha = rough * rough;
@@ -522,7 +537,12 @@ fn shade(n_in: vec3<f32>, world: vec3<f32>, base: vec3<f32>, front: bool, rough_
         let sheen_energy = 1.0 - max3(sheen_col) * max(ibl_sheen_brdf(n, v, sheen_rough), ibl_sheen_brdf(n, l, sheen_rough));
         let sheen_direct = sheen_col * d_charlie(sheen_rough, ndh) * v_neubelt(ndv, ndl) * ndl * PI;
         let cc_spec = fresnel_schlick(max(dot(v, h), 0.0), cc_f0, cc_f90) * d_ggx(ndh, coat_rough) * v_smith(ndv, ndl, coat_rough) * PI * step(0.0001, ndl);
-        let lit = (diffuse * ndl + spec) * sheen_energy + sheen_direct;
+        // metals reflect the default studio (dielectrics keep the plain default light)
+        let r = reflect(-v, n);
+        let studio = default_studio_env(r, right, up, -frame.cam_dir.xyz, rough);
+        // render.z: the interactive viewport only; hardware renders keep the plain default light
+        let env_spec = studio * fresnel_schlick(ndv, f0, f90) * metal * frame.render.z;
+        let lit = (diffuse * ndl + spec + env_spec) * sheen_energy + sheen_direct;
         return (lit + emission) * (1.0 - coat * fcc) + cc_spec * coat;
     }
     if (frame.mode.x > 2.5) {

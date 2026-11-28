@@ -21,3 +21,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 half = "2"
 resvg = "0.48"
 rhai = { version = "1", features = ["sync"] }
+
+[dev-dependencies]
+# validates the WGSL shaders in unit tests (the same naga wgpu compiles them with)
+naga = { version = "30", features = ["wgsl-in"] }

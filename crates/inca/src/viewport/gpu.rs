@@ -100,7 +100,9 @@ pub struct FrameUniform {
     pub bg_bottom: [f32; 4],
     pub mode: [f32; 4],
     pub post: [f32; 4],
-    /// x = tone mapping (0 none, 1 ACES, 2 AgX, 3 Neutral, 4 Linear), y = transparent background
+    /// x = tone mapping (0 none, 1 ACES, 2 AgX, 3 Neutral, 4 Linear), y = transparent background,
+    /// z = 1 for the interactive viewport (Default Lighting's studio reflection on metals),
+    /// 0 for hardware renders, which keep the plain default light
     pub render: [f32; 4],
     /// x = sky present (All lighting), y = show background, z = tan(fov_y/2), w = aspect
     pub sky: [f32; 4],
@@ -1355,6 +1357,16 @@ impl Gpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Both shaders parse and pass naga's validation, so a WGSL mistake fails `cargo test`
+    /// instead of the app at start-up.
+    #[test]
+    fn wgsl_shaders_validate() {
+        for (name, src) in [("shader.wgsl", include_str!("shader.wgsl")), ("shadow.wgsl", include_str!("shadow.wgsl"))] {
+            let module = naga::front::wgsl::parse_str(src).unwrap_or_else(|e| panic!("{name}: {}", e.emit_to_string(src)));
+            naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all()).validate(&module).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+        }
+    }
 
     #[test]
     fn transmission_packs_amount_and_thickness_into_the_draw_uniform() {

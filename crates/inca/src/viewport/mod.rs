@@ -1322,7 +1322,7 @@ pub fn frame_uniform(s: &Scene, vp: &Viewport, cv: &CamView, bg_mode: usize) -> 
         bg_bottom,
         mode: [light_mode, count as f32, if vp.xray { 1.0 } else { 0.0 }, if vp.backface { 1.0 } else { 0.0 }],
         post: [vp.exposure, vp.gamma.max(0.05), cv.size[0].max(1.0), cv.size[1].max(1.0)],
-        render: [0.0; 4],
+        render: [0.0, 0.0, if vp.beauty { 0.0 } else { 1.0 }, 0.0],
         sky,
         sky_col,
         lights,
@@ -2733,6 +2733,17 @@ mod tests {
         s.set_attr(&r, "smoothLevel", serde_json::json!(3));
         let d3 = display_mesh(&s, &id, &mut cache, 2).unwrap();
         assert_eq!(d3.v.len(), d2.v.len());
+    }
+
+    /// The Default Lighting studio reflection is for the interactive viewport only: a hardware
+    /// render (beauty) keeps the plain default light.
+    #[test]
+    fn default_studio_reflection_is_viewport_only() {
+        let (s, vp, cv, _) = setup();
+        assert_eq!(frame_uniform(&s, &vp, &cv, 0).render[2], 1.0);
+        let mut render = vp.clone();
+        render.beauty = true;
+        assert_eq!(frame_uniform(&s, &render, &cv, 0).render[2], 0.0);
     }
 
     #[test]

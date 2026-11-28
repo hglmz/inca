@@ -1874,6 +1874,7 @@ dependencies = [
  "image",
  "inca-core",
  "indexmap",
+ "naga",
  "resvg",
  "rfd",
  "rhai",
