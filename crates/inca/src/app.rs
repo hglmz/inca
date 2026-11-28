@@ -126,6 +126,7 @@ pub struct Windows {
     pub delete_attributes: bool,
     pub edit_attributes: bool,
     pub expression_editor: bool,
+    pub content_browser: bool,
     pub rename: Option<String>,
     /// In-app notice shown after changing the rendering backend.
     pub backend_notice: Option<String>,
@@ -156,7 +157,7 @@ pub struct UiHost {
 
 impl Host for UiHost {
     fn ui(&mut self, _s: &mut Scene, cmd: &str, args: &[Val]) -> Option<Result<Val, String>> {
-        const UI: &[&str] = &["setToolTo", "viewFit", "FrameSelected", "FrameAll", "refresh", "play", "ScriptEditor", "HypershadeWindow", "GraphEditor", "RenderViewWindow", "OutlinerWindow", "render", "modelEditor", "workspace", "inViewMessage", "headsUpMessage", "confirmDialog", "promptDialog", "setProject"];
+        const UI: &[&str] = &["setToolTo", "viewFit", "FrameSelected", "FrameAll", "refresh", "play", "ScriptEditor", "HypershadeWindow", "ContentBrowserWindow", "contentBrowser", "GraphEditor", "RenderViewWindow", "OutlinerWindow", "render", "modelEditor", "workspace", "inViewMessage", "headsUpMessage", "confirmDialog", "promptDialog", "setProject"];
         if UI.contains(&cmd) {
             self.reqs.push((cmd.into(), args.to_vec()));
             return Some(Ok(Val::None));
@@ -600,6 +601,9 @@ impl IncaApp {
             app.windows_state.window_last_rect = crate::windows::decode_window_rects(saved);
         }
         if app.test.is_none() {
+            if let Some(p) = cc.storage.and_then(|s| eframe::get_value(s, "contentBrowser")) {
+                app.windows_state.cb.prefs = p;
+            }
             if let Some(p) = cc.storage.and_then(|s| eframe::get_value::<String>(s, "lastProject")) {
                 crate::project::set_project(&mut app, &p, true);
                 app.script_log.clear();
@@ -973,6 +977,16 @@ impl IncaApp {
             "FrameAll" => self.action("frameAll"),
             "ScriptEditor" => self.win.script_editor = true,
             "HypershadeWindow" => self.win.hypershade = true,
+            "ContentBrowserWindow" | "contentBrowser" => {
+                self.win.content_browser = true;
+                // Maya's `contentBrowser -location <place>`: an "Examples/..." folder or a directory
+                let strs: Vec<String> = args.iter().map(|a| a.str()).collect();
+                if let Some(i) = strs.iter().position(|a| a == "-location" || a == "-loc") {
+                    if let Some(place) = strs.get(i + 1) {
+                        crate::content_browser::go_to_location(self, place);
+                    }
+                }
+            }
             "GraphEditor" => self.win.graph_editor = true,
             "RenderViewWindow" | "render" => {
                 self.win.render_view = true;
@@ -1561,6 +1575,7 @@ impl eframe::App for IncaApp {
             return;
         }
         eframe::set_value(storage, "recent", &self.recent);
+        eframe::set_value(storage, "contentBrowser", &self.windows_state.cb.prefs);
         eframe::set_value(storage, "shelves", &self.shelves);
         eframe::set_value(storage, "workspace", &self.workspace);
         eframe::set_value(storage, "bgMode", &self.bg_mode);

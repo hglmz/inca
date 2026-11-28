@@ -5,6 +5,7 @@ mod actions;
 mod anim_extras;
 mod app;
 mod component_editor;
+mod content_browser;
 mod edit_cmds;
 mod hypershade;
 mod hotkey_editor;

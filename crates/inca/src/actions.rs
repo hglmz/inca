@@ -222,6 +222,7 @@ pub static ACTIONS: &[(&str, &str, &str)] = &[
     ("toolSettings", "Tool Settings", ""),
     ("scriptEditor", "Script Editor", ""),
     ("hypershade", "Hypershade", ""),
+    ("contentBrowser", "Content Browser", ""),
     ("graphEditor", "Graph Editor", ""),
     ("dopeSheet", "Dope Sheet", ""),
     ("graphFrameSelected", "Graph Editor: Frame Selected", "F"),
@@ -393,7 +394,7 @@ pub fn repeatable(id: &str) -> bool {
         "growSelection", "shrinkSelection", "deselectAll", "selectAll", "selectHierarchy", "hideSelection", "showSelection", "showLastHidden", "hideUnselected",
     ];
     const NO_PREFIX: &[&str] = &["frame", "toggle", "shade", "layout", "menuSet", "symmetry", "smoothO", "smoothC", "hud", "select", "to", "show", "snap"];
-    !NO.contains(&id) && !NO_PREFIX.iter().any(|p| id.starts_with(p) && id[p.len()..].starts_with(|c: char| c.is_uppercase())) && !matches!(id, "graphEditor" | "dopeSheet" | "hypershade" | "renderView" | "renderSettings" | "scriptEditor" | "uvEditor" | "preferences" | "hotkeyEditor" | "hotkeyList" | "shelfEditor" | "componentEditor" | "connectionEditor" | "hypergraph" | "hypergraphConnections" | "playblast" | "projectWindow" | "humanIK")
+    !NO.contains(&id) && !NO_PREFIX.iter().any(|p| id.starts_with(p) && id[p.len()..].starts_with(|c: char| c.is_uppercase())) && !matches!(id, "graphEditor" | "dopeSheet" | "hypershade" | "contentBrowser" | "renderView" | "renderSettings" | "scriptEditor" | "uvEditor" | "preferences" | "hotkeyEditor" | "hotkeyList" | "shelfEditor" | "componentEditor" | "connectionEditor" | "hypergraph" | "hypergraphConnections" | "playblast" | "projectWindow" | "humanIK")
 }
 
 pub fn hotkey_label(id: &str) -> &'static str {
@@ -1243,6 +1244,7 @@ pub fn builtin(app: &mut IncaApp, id: &str) {
         }
         "scriptEditor" => app.win.script_editor = !app.win.script_editor,
         "hypershade" => app.win.hypershade = !app.win.hypershade,
+        "contentBrowser" => app.win.content_browser = !app.win.content_browser,
         "graphEditor" => app.win.graph_editor = !app.win.graph_editor,
         "dopeSheet" => app.win.dope_sheet = !app.win.dope_sheet,
         "graphFrameSelected" => app.windows_state.ge_frame = Some(1),

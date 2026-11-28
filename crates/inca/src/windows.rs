@@ -135,6 +135,7 @@ pub struct WinState {
     pub window_last_rect: std::collections::HashMap<u64, egui::Rect>,
     pub rv: crate::render_view::RvState,
     pub hs: crate::hypershade::HsState,
+    pub cb: crate::content_browser::CbState,
 }
 
 impl WinState {
@@ -447,6 +448,19 @@ pub fn show(app: &mut IncaApp, ctx: &egui::Context, _frame: &mut eframe::Frame) 
             window.show(ctx, |ui| crate::panels::expression_editor_window(app, ui))
         });
         app.win.expression_editor = open && app.win.expression_editor;
+    }
+    let mut open = app.win.content_browser;
+    let is_open = open;
+    let _ = place_window(app, ctx, egui::Id::new("ContentBrowserWindow"), is_open, |app, fix| {
+        let mut window = egui::Window::new("Content Browser").id(egui::Id::new("ContentBrowserWindow")).open(&mut open).default_size([1100.0, 620.0]).min_size([640.0, 360.0]).constrain(false);
+        if let Some(p) = fix {
+            window = window.fixed_pos(p);
+        }
+        window.show(ctx, |ui| crate::content_browser::window(app, ui))
+    });
+    app.win.content_browser = open && app.win.content_browser;
+    if !app.win.content_browser {
+        app.windows_state.cb.idle();
     }
     let mut open = app.win.render_view;
     let is_open = open;

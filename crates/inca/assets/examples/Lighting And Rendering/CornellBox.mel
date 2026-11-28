@@ -1,0 +1,73 @@
+// @name Cornell Box
+// @description The classic Cornell box: a white room with a red and a green wall, two rotated boxes and a single ceiling area light, ideal for seeing colour bleeding and soft shadows in the path tracer.
+// @kind scene
+
+// ---- room: 5 x 5 x 5, open toward +Z ----
+string $floor[] = `polyPlane -w 5 -h 5 -sx 1 -sy 1 -n floor`;
+string $ceiling[] = `polyPlane -w 5 -h 5 -sx 1 -sy 1 -n ceiling`;
+xform -ws -t 0 5 0 -ro 180 0 0 $ceiling[0];
+string $back[] = `polyPlane -w 5 -h 5 -sx 1 -sy 1 -n backWall`;
+xform -ws -t 0 2.5 -2.5 -ro 90 0 0 $back[0];
+string $left[] = `polyPlane -w 5 -h 5 -sx 1 -sy 1 -n leftWall`;
+xform -ws -t -2.5 2.5 0 -ro 0 0 -90 $left[0];
+string $right[] = `polyPlane -w 5 -h 5 -sx 1 -sy 1 -n rightWall`;
+xform -ws -t 2.5 2.5 0 -ro 0 0 90 $right[0];
+
+// ---- the two boxes ----
+string $short[] = `polyCube -w 1.5 -h 1.5 -d 1.5 -n shortBox`;
+xform -ws -t 0.85 0.75 0.65 -ro 0 -17 0 $short[0];
+string $tall[] = `polyCube -w 1.5 -h 3 -d 1.5 -n tallBox`;
+xform -ws -t -0.85 1.5 -0.75 -ro 0 17 0 $tall[0];
+
+// ---- visible light panel (emissive lambert), just under the ceiling ----
+string $panel[] = `polyPlane -w 1.2 -h 1.2 -sx 1 -sy 1 -n lightPanel`;
+xform -ws -t 0 4.995 0 -ro 180 0 0 $panel[0];
+
+// ---- materials (lambert: no specular, the classic Cornell look) ----
+string $white = `shadingNode -asShader lambert -n cbWhite`;
+setAttr ($white + ".color") -type double3 0.73 0.73 0.73;
+setAttr ($white + ".diffuse") 1;
+string $red = `shadingNode -asShader lambert -n cbRed`;
+setAttr ($red + ".color") -type double3 0.63 0.065 0.05;
+setAttr ($red + ".diffuse") 1;
+string $green = `shadingNode -asShader lambert -n cbGreen`;
+setAttr ($green + ".color") -type double3 0.14 0.45 0.091;
+setAttr ($green + ".diffuse") 1;
+string $glow = `shadingNode -asShader lambert -n cbLight`;
+setAttr ($glow + ".color") -type double3 1 1 1;
+setAttr ($glow + ".incandescence") -type double3 1 0.9 0.75;
+
+select -r $floor[0] $ceiling[0] $back[0] $short[0] $tall[0];
+hyperShade -assign $white;
+select -r $left[0];
+hyperShade -assign $red;
+select -r $right[0];
+hyperShade -assign $green;
+select -r $panel[0];
+hyperShade -assign $glow;
+
+// ---- ceiling area light, facing down (local -Z -> world -Y), 1.2 x 1.2 ----
+string $light = `areaLight -n ceilingLight -i 30`;
+xform -ws -t 0 4.98 0 -ro -90 0 0 -s 0.6 0.6 1 $light;
+setAttr ($light + ".color") -type double3 1 0.85 0.65;
+setAttr ($light + ".decayRate") 2;
+
+// ---- camera: classic front view ----
+string $cam[] = `camera -n cornellCam -fl 50`;
+xform -ws -t 0 2.5 9.3 -ro 0 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 9.3;
+
+group -n CornellBox $floor[0] $ceiling[0] $back[0] $left[0] $right[0] $short[0] $tall[0] $panel[0] $light $cam[0];
+select -cl;
+
+// @settings
+xform -ws -t 0 2.5 15 -ro 0 0 0 persp;
+setAttr perspShape.focalLength 50;
+setAttr perspShape.coi 15;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "cornellCam";
+setAttr defaultResolution.width 512;
+setAttr defaultResolution.height 512;
+setAttr defaultRenderGlobals.samples 256;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.background 0 0 0;

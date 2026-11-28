@@ -173,7 +173,7 @@ pub fn common(name: &str) -> Vec<M> {
         "Windows" => vec![
             Dyn("Workspaces"),
             Sep,
-            Sub("General Editors", vec![A("scriptEditor"), A("componentEditor"), A("connectionEditor"), A("hypergraph"), A("hypergraphConnections"), A("shelfEditor"), A("melReference")]),
+            Sub("General Editors", vec![A("contentBrowser"), A("scriptEditor"), A("componentEditor"), A("connectionEditor"), A("hypergraph"), A("hypergraphConnections"), A("shelfEditor"), A("melReference")]),
             Sub("Panels", vec![A("panelShelf"), A("panelToolbox"), A("panelOutliner"), A("panelRight"), A("panelTimeslider"), A("panelRangeslider"), A("panelCmdline")]),
             A("modelingToolkit"),
             Sub("Modeling Editors", vec![A("uvEditor")]),
@@ -181,6 +181,7 @@ pub fn common(name: &str) -> Vec<M> {
             Sub("Animation Editors", vec![A("graphEditor"), A("dopeSheet")]),
             Sep,
             A("outlinerWindow"),
+            A("contentBrowser"),
             A("attributeEditor"),
             A("channelBox"),
             A("toolSettings"),

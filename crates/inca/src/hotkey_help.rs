@@ -324,6 +324,7 @@ pub fn describe(id: &str) -> Option<&'static str> {
         "toolSettings" => "Opens the Tool Settings editor.",
         "scriptEditor" => "Opens the Script Editor.",
         "hypershade" => "Opens the Hypershade.",
+        "contentBrowser" => "Opens the Content Browser: browse the project, the file system, built-in examples and favorites, and drag files into the scene.",
         "graphEditor" => "Opens the Graph Editor.",
         "dopeSheet" => "Opens the Dope Sheet.",
         "graphFrameSelected" => "Frames the selected key or the visible curves in the Graph Editor.",
