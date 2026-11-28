@@ -1,0 +1,100 @@
+// @name Sun And Sky
+// @description An outdoor afternoon scene with low-poly trees and rocks on a grassy meadow, lit by a warm directional sun with shadows and a soft blue sky dome.
+// @kind scene
+
+// ---- grassy ground ----
+string $ground[] = `polyPlane -w 2000 -h 2000 -sx 1 -sy 1 -n ground`;
+string $grass = `shadingNode -asShader lambert -n grassMat`;
+setAttr ($grass + ".color") -type double3 0.17 0.33 0.1;
+select -r $ground[0];
+hyperShade -assign $grass;
+
+// ---- materials for the props ----
+string $bark = `shadingNode -asShader lambert -n barkMat`;
+setAttr ($bark + ".color") -type double3 0.3 0.19 0.1;
+string $leaves = `shadingNode -asShader lambert -n leafMat`;
+setAttr ($leaves + ".color") -type double3 0.12 0.36 0.14;
+string $leavesLight = `shadingNode -asShader lambert -n leafLightMat`;
+setAttr ($leavesLight + ".color") -type double3 0.3 0.5 0.12;
+string $stone = `shadingNode -asShader standardSurface -n rockMat`;
+setAttr ($stone + ".baseColor") -type double3 0.3 0.29 0.27;
+setAttr ($stone + ".specular") 0.3;
+setAttr ($stone + ".specularRoughness") 0.7;
+
+// ---- low-poly trees: a cylinder trunk with two stacked cones ----
+float $tx[] = {-5.5, -2.8, 1.2, 4.6, 7.2, -8.5};
+float $tz[] = {-3.0, -6.5, -4.2, -1.5, -7.0, -8.0};
+float $ts[] = {1.15, 1.5, 1.3, 0.95, 1.6, 1.35};
+float $tr[] = {10, 35, 70, 5, 50, 22};
+string $trees[] = {};
+for ($i = 0; $i < size($tx); $i++) {
+    string $trunk[] = `polyCylinder -r 0.16 -h 1.4 -sa 7 -n treeTrunk`;
+    xform -ws -t 0 0.7 0 $trunk[0];
+    select -r $trunk[0];
+    hyperShade -assign $bark;
+    string $low[] = `polyCone -r 1.0 -h 1.9 -sa 7 -n treeCrownLow`;
+    xform -ws -t 0 1.95 0 $low[0];
+    string $top[] = `polyCone -r 0.72 -h 1.5 -sa 7 -n treeCrownTop`;
+    xform -ws -t 0 2.85 0 -ro 0 25 0 $top[0];
+    // hard edges everywhere: a faceted low-poly look (and clean cone tips)
+    polySoftEdge -a 0 -ch 0 $trunk[0] $low[0] $top[0];
+    select -r $low[0] $top[0];
+    if ($i % 2 == 0) hyperShade -assign $leaves;
+    else hyperShade -assign $leavesLight;
+    string $tree = `group -n tree $trunk[0] $low[0] $top[0]`;
+    xform -ws -t $tx[$i] 0 $tz[$i] -ro 0 $tr[$i] 0 -s $ts[$i] $ts[$i] $ts[$i] $tree;
+    $trees[size($trees)] = $tree;
+}
+
+// ---- rocks: squashed, tumbled platonic solids sunk into the ground ----
+float $rx[] = {-1.2, 2.9, 3.6, -4.0, 0.4};
+float $rz[] = {0.8, 1.6, 2.1, 1.8, -2.2};
+float $rs[] = {0.7, 0.55, 0.32, 0.45, 0.4};
+int $rp[] = {3, 2, 3, 2, 3};
+string $rocks[] = {};
+for ($i = 0; $i < size($rx); $i++) {
+    string $r[] = `polyPlatonic -p $rp[$i] -r 1 -n rock`;
+    xform -ws -t $rx[$i] ($rs[$i] * 0.35) $rz[$i] -ro (17 * $i) (41 * $i + 10) (9 * $i) -s ($rs[$i] * 1.4) ($rs[$i] * 0.75) $rs[$i] $r[0];
+    polySoftEdge -a 0 -ch 0 $r[0];
+    select -r $r[0];
+    hyperShade -assign $stone;
+    $rocks[size($rocks)] = $r[0];
+}
+
+// ---- sun: warm directional light, low in the sky, casting shadows ----
+string $sun = `directionalLight -n sun`;
+// a directional light only uses its rotation; the icon sits above the meadow
+xform -ws -t 3.5 6 -1 -ro -38 55 0 $sun;
+setAttr ($sun + ".intensity") 2.1;
+setAttr ($sun + ".color") -type double3 1 0.86 0.66;
+setAttr ($sun + ".shadows") 1;
+
+// ---- sky: soft blue dome (a flat colour in the path tracer) ----
+string $sky = `skyDomeLight -n sky`;
+setAttr ($sky + ".color") -type double3 0.36 0.56 0.95;
+setAttr ($sky + ".intensity") 0.85;
+// a dome has no position: park its icon under the ground
+xform -ws -t 0 -3 0 $sky;
+
+// ---- render camera ----
+string $cam[] = `camera -n sunSkyCam -fl 32`;
+xform -ws -t 0 1.9 11.5 -ro -4 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 14;
+
+select -r $ground[0] $trees $rocks $sun $sky $cam[0];
+group -n SunAndSky;
+select -cl;
+
+// @settings
+// behind and above the render camera (its icon stays below the view)
+xform -ws -t 0 4.6 15.5 -ro -8 0 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 18;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "sunSkyCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 128;
+setAttr defaultRenderGlobals.bounces 4;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+setAttr defaultRenderGlobals.background 0.31 0.48 0.81;

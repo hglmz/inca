@@ -1,0 +1,187 @@
+// @name Low-Poly House
+// @description A cheerful low-poly diorama on a grassy island: a little house with a prism roof, two pines and a round tree, a stepping-stone path and a picket fence built with a MEL for-loop.
+// @kind scene
+
+// ---- flat colors (names are captured, so a second import gets its own set)
+proc string lphFlat(string $name, float $r, float $g, float $b)
+{
+    string $m = `shadingNode -asShader lambert -n $name`;
+    setAttr ($m + ".color") -type double3 $r $g $b;
+    return $m;
+}
+string $mGrass = lphFlat("lphGrassMtl", 0.36, 0.68, 0.24);
+string $mSoil  = lphFlat("lphSoilMtl", 0.45, 0.30, 0.20);
+string $mWall  = lphFlat("lphWallMtl", 0.96, 0.90, 0.78);
+string $mRoof  = lphFlat("lphRoofMtl", 0.86, 0.30, 0.24);
+string $mDoor  = lphFlat("lphDoorMtl", 0.45, 0.27, 0.16);
+string $mGlass = lphFlat("lphGlassMtl", 0.55, 0.80, 0.95);
+string $mTrim  = lphFlat("lphTrimMtl", 0.98, 0.98, 0.96);
+string $mBark  = lphFlat("lphBarkMtl", 0.42, 0.28, 0.18);
+string $mLeaf  = lphFlat("lphLeafMtl", 0.20, 0.55, 0.28);
+string $mLeaf2 = lphFlat("lphLeafLightMtl", 0.50, 0.75, 0.25);
+string $mFence = lphFlat("lphFenceMtl", 0.93, 0.86, 0.72);
+string $mStone = lphFlat("lphStoneMtl", 0.70, 0.70, 0.68);
+
+string $parts[];
+string $r[];
+
+// ---- island: a chunk of soil topped with a slightly wider slab of grass
+$r = `polyCylinder -r 7 -h 0.76 -sa 14 -n lphSoilBase`;
+xform -ws -t 0 -0.52 0 $r[0];
+select -r $r[0];
+hyperShade -assign $mSoil;
+$parts[size($parts)] = $r[0];
+$r = `polyCylinder -r 7.15 -h 0.14 -sa 14 -n lphGround`;
+xform -ws -t 0 -0.07 0 $r[0];
+select -r $r[0];
+hyperShade -assign $mGrass;
+$parts[size($parts)] = $r[0];
+
+// ---- house: box body, prism roof, chimney, door and windows as separate boxes
+string $house[];
+$r = `polyCube -w 3 -h 2.2 -d 2.6 -n lphBody`;
+xform -ws -t 0 1.1 0 $r[0];
+select -r $r[0];
+hyperShade -assign $mWall;
+$house[size($house)] = $r[0];
+
+$r = `polyPrism -l 3.2 -w 3.8 -ns 3 -n lphRoof`;
+xform -ws -t 0 2.75 0 -ro 90 0 90 -s 0.5 1 1 $r[0];
+select -r $r[0];
+hyperShade -assign $mRoof;
+$house[size($house)] = $r[0];
+
+$r = `polyCube -w 0.45 -h 1.1 -d 0.45 -n lphChimney`;
+xform -ws -t 0.85 3.3 -0.5 $r[0];
+select -r $r[0];
+hyperShade -assign $mRoof;
+$house[size($house)] = $r[0];
+
+$r = `polyCube -w 0.75 -h 1.35 -d 0.12 -n lphDoor`;
+xform -ws -t 0 0.675 1.3 $r[0];
+select -r $r[0];
+hyperShade -assign $mDoor;
+$house[size($house)] = $r[0];
+
+// front windows either side of the door, side windows on +X and -X
+float $win[] = { -0.95, 1.35, 1.3, 0,    0.95, 1.35, 1.3, 0,
+                  1.5, 1.35, 0.0, 90,   -1.5, 1.35, 0.0, 90 };
+for ($i = 0; $i < 4; $i++) {
+    $r = `polyCube -w 0.75 -h 0.75 -d 0.1 -n lphWindowFrame`;
+    xform -ws -t $win[$i * 4] $win[$i * 4 + 1] $win[$i * 4 + 2] -ro 0 $win[$i * 4 + 3] 0 $r[0];
+    select -r $r[0];
+    hyperShade -assign $mTrim;
+    $house[size($house)] = $r[0];
+    $r = `polyCube -w 0.6 -h 0.6 -d 0.14 -n lphWindowGlass`;
+    xform -ws -t $win[$i * 4] $win[$i * 4 + 1] $win[$i * 4 + 2] -ro 0 $win[$i * 4 + 3] 0 $r[0];
+    select -r $r[0];
+    hyperShade -assign $mGlass;
+    $house[size($house)] = $r[0];
+}
+select -r $house;
+string $houseGrp = `group -n lphHouse`;
+xform -ws -ro 0 -15 0 $houseGrp;
+$parts[size($parts)] = $houseGrp;
+
+// ---- stepping-stone path from the door out through the gate in the fence
+float $stones[] = { -0.36, 1.95,   -0.2, 2.6,   -0.04, 3.25,   0.04, 3.9,   0.0, 4.75 };
+for ($i = 0; $i < 5; $i++) {
+    $r = `polyCylinder -r 0.3 -h 0.08 -sa 7 -n lphStone`;
+    xform -ws -t $stones[$i * 2] 0.04 $stones[$i * 2 + 1] -ro 0 (37 * $i) 0 $r[0];
+    select -r $r[0];
+    hyperShade -assign $mStone;
+    $parts[size($parts)] = $r[0];
+}
+
+// ---- trees: two pines (stacked cones) and a round tree (icosahedron)
+proc string lphPine(string $bark, string $leaf, float $x, float $z, float $s)
+{
+    string $p[];
+    string $t[] = `polyCylinder -r 0.15 -h 0.8 -sa 6 -n lphTrunk`;
+    xform -ws -t 0 0.4 0 $t[0];
+    select -r $t[0];
+    hyperShade -assign $bark;
+    $p[0] = $t[0];
+    for ($k = 0; $k < 3; $k++) {
+        string $c[] = `polyCone -r (1.0 - 0.22 * $k) -h 1.2 -sa 7 -n lphPineCone`;
+        xform -ws -t 0 (1.2 + 0.55 * $k) 0 -ro 0 (20 * $k) 0 $c[0];
+        select -r $c[0];
+        hyperShade -assign $leaf;
+        $p[$k + 1] = $c[0];
+    }
+    select -r $p;
+    string $g = `group -n lphPine`;
+    xform -ws -t $x 0 $z -s $s $s $s $g;
+    return $g;
+}
+$parts[size($parts)] = lphPine($mBark, $mLeaf, -4.6, -1.8, 1.25);
+$parts[size($parts)] = lphPine($mBark, $mLeaf, -4.0, 1.2, 0.85);
+
+$r = `polyCylinder -r 0.16 -h 1.1 -sa 6 -n lphTrunk`;
+xform -ws -t 3.7 0.55 -1.4 $r[0];
+select -r $r[0];
+hyperShade -assign $mBark;
+string $roundTrunk = $r[0];
+$r = `polyPlatonic -p 2 -r 1.0 -n lphCrown`;
+xform -ws -t 3.7 1.75 -1.4 -ro 10 20 0 $r[0];
+select -r $r[0];
+hyperShade -assign $mLeaf2;
+select -r $roundTrunk $r[0];
+$parts[size($parts)] = `group -n lphRoundTree`;
+
+// ---- picket fence: one post, duplicated along the front edge by a for-loop
+string $fence[];
+string $post[] = `polyCube -w 0.14 -h 0.8 -d 0.1 -n lphPost`;
+xform -ws -t -4.2 0.4 4.2 $post[0];
+select -r $post[0];
+hyperShade -assign $mFence;
+$fence[0] = $post[0];
+for ($i = 1; $i < 15; $i++) {
+    if ($i == 7) continue;   // leave a gap for the path
+    string $d[] = `duplicate $post[0]`;
+    move -r (0.6 * $i) 0 0 $d[0];
+    $fence[size($fence)] = $d[0];
+}
+// two rails on each side of the gate
+float $rails[] = { -4.2, -0.6, 0.6, 4.2 };
+for ($i = 0; $i < 2; $i++) {
+    float $x0 = $rails[$i * 2];
+    float $x1 = $rails[$i * 2 + 1];
+    for ($h = 0; $h < 2; $h++) {
+        $r = `polyCube -w ($x1 - $x0) -h 0.08 -d 0.06 -n lphRail`;
+        xform -ws -t (($x0 + $x1) / 2.0) (0.25 + 0.3 * $h) 4.14 $r[0];
+        select -r $r[0];
+        hyperShade -assign $mFence;
+        $fence[size($fence)] = $r[0];
+    }
+}
+select -r $fence;
+$parts[size($parts)] = `group -n lphFence`;
+
+// ---- lights: warm afternoon sun plus a blue sky dome
+string $sun = `directionalLight -n lphSun`;
+setAttr ($sun + ".intensity") 1.5;
+setAttr ($sun + ".color") -type double3 1.0 0.93 0.80;
+setAttr ($sun + ".shadows") 1;
+// a directional light only uses its rotation: its icon is tucked under the island
+xform -ws -t 2 -3 0 -ro -50 40 0 $sun;
+string $sky = `skyDomeLight -n lphSky`;
+setAttr ($sky + ".color") -type double3 0.55 0.76 1.0;
+setAttr ($sky + ".intensity") 0.55;
+// the dome icon sits under the island too (its position does not matter)
+xform -ws -t -2 -3 0 $sky;
+
+select -r $parts $sun $sky;
+group -n LowPolyHouse;
+select -cl;
+// @settings
+xform -ws -t 13.5 10 17.5 -ro -24.2 37.6 0 persp;
+setAttr perspShape.focalLength 42;
+setAttr perspShape.coi 23.9;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "persp";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 128;
+setAttr defaultRenderGlobals.bounces 4;
+setAttr defaultRenderGlobals.toneMapping -type "string" "neutral";

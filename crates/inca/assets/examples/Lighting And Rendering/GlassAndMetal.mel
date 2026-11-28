@@ -1,0 +1,109 @@
+// @name Glass And Metal
+// @description Five standard surface spheres in a row on a checker floor (glossy red plastic, gold, rough chrome, mirror chrome and clear glass), lit by one large soft area light and a dim sky dome, for comparing how each material reflects and refracts.
+// @kind scene
+
+// ---- checker floor ----
+string $floor[] = `polyPlane -w 24 -h 24 -sx 1 -sy 1 -n floor`;
+string $floorMat = `shadingNode -asShader standardSurface -n floorMat`;
+setAttr ($floorMat + ".specular") 0.4;
+setAttr ($floorMat + ".specularRoughness") 0.35;
+string $checker = `shadingNode -asTexture checker -n floorChecker`;
+setAttr ($checker + ".color1") -type double3 0.7 0.7 0.68;
+setAttr ($checker + ".color2") -type double3 0.12 0.12 0.13;
+// every texture comes with its own place2dTexture: tile the checker through it
+string $place[] = `listConnections ($checker + ".uvCoord")`;
+setAttr ($place[0] + ".repeatU") 12;
+setAttr ($place[0] + ".repeatV") 12;
+connectAttr -f ($checker + ".outColor") ($floorMat + ".baseColor");
+select -r $floor[0];
+hyperShade -assign $floorMat;
+
+// ---- backdrop wall behind the row, so metals have something to reflect ----
+string $wall[] = `polyPlane -w 24 -h 10 -sx 1 -sy 1 -n backdrop`;
+xform -ws -t 0 5 -5 -ro 90 0 0 $wall[0];
+string $wallMat = `shadingNode -asShader lambert -n backdropMat`;
+setAttr ($wallMat + ".color") -type double3 0.3 0.34 0.42;
+select -r $wall[0];
+hyperShade -assign $wallMat;
+
+// ---- the spheres ----
+string $plastic[] = `polySphere -r 0.8 -sa 48 -sh 32 -n plasticBall`;
+xform -ws -t -4 0.8 0 $plastic[0];
+string $gold[] = `polySphere -r 0.8 -sa 48 -sh 32 -n goldBall`;
+xform -ws -t -2 0.8 0 $gold[0];
+string $rough[] = `polySphere -r 0.8 -sa 48 -sh 32 -n roughChromeBall`;
+xform -ws -t 0 0.8 0 $rough[0];
+string $chrome[] = `polySphere -r 0.8 -sa 48 -sh 32 -n chromeBall`;
+xform -ws -t 2 0.8 0 $chrome[0];
+string $glass[] = `polySphere -r 0.8 -sa 48 -sh 32 -n glassBall`;
+xform -ws -t 4 0.8 0 $glass[0];
+
+string $mPlastic = `shadingNode -asShader standardSurface -n redPlastic`;
+setAttr ($mPlastic + ".baseColor") -type double3 0.7 0.06 0.05;
+setAttr ($mPlastic + ".specularRoughness") 0.25;
+string $mGold = `shadingNode -asShader standardSurface -n gold`;
+setAttr ($mGold + ".base") 1;
+setAttr ($mGold + ".baseColor") -type double3 1 0.71 0.29;
+setAttr ($mGold + ".metalness") 1;
+setAttr ($mGold + ".specularRoughness") 0.2;
+string $mRough = `shadingNode -asShader standardSurface -n roughChrome`;
+setAttr ($mRough + ".base") 1;
+setAttr ($mRough + ".baseColor") -type double3 0.9 0.9 0.9;
+setAttr ($mRough + ".metalness") 1;
+setAttr ($mRough + ".specularRoughness") 0.45;
+string $mChrome = `shadingNode -asShader standardSurface -n chrome`;
+setAttr ($mChrome + ".base") 1;
+setAttr ($mChrome + ".baseColor") -type double3 0.95 0.95 0.95;
+setAttr ($mChrome + ".metalness") 1;
+setAttr ($mChrome + ".specularRoughness") 0.03;
+string $mGlass = `shadingNode -asShader standardSurface -n glass`;
+setAttr ($mGlass + ".baseColor") -type double3 1 1 1;
+setAttr ($mGlass + ".transmission") 1;
+setAttr ($mGlass + ".specularIOR") 1.5;
+setAttr ($mGlass + ".specularRoughness") 0;
+
+select -r $plastic[0];
+hyperShade -assign $mPlastic;
+select -r $gold[0];
+hyperShade -assign $mGold;
+select -r $rough[0];
+hyperShade -assign $mRough;
+select -r $chrome[0];
+hyperShade -assign $mChrome;
+select -r $glass[0];
+hyperShade -assign $mGlass;
+
+// ---- one large area light above and in front, tilted toward the spheres ----
+// 8 x 3 units (size = 2 * scale); local -Z tilted 60 degrees down toward the row
+string $key = `areaLight -n softbox -i 0.9`;
+xform -ws -t 0 6 4 -ro -60 0 0 -s 4 1.5 1 $key;
+setAttr ($key + ".decayRate") 0;
+setAttr ($key + ".color") -type double3 1 0.96 0.9;
+
+// ---- dim, cool sky dome: an environment for the metals and glass to reflect ----
+string $sky = `skyDomeLight -n gmSky -i 0.25`;
+setAttr ($sky + ".color") -type double3 0.75 0.82 0.95;
+// a dome has no position: park its icon behind the backdrop
+xform -ws -t 0 0 -7 $sky;
+
+// ---- render camera ----
+string $cam[] = `camera -n glassMetalCam -fl 40`;
+xform -ws -t 0 2.3 12.5 -ro -6 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 12.6;
+
+group -n GlassAndMetal $floor[0] $wall[0] $plastic[0] $gold[0] $rough[0] $chrome[0] $glass[0] $key $sky $cam[0];
+select -cl;
+
+// @settings
+// in front of the render camera, a little higher, so its icon stays out of view
+xform -ws -t 0 3.4 10.5 -ro -11 0 0 persp;
+setAttr perspShape.focalLength 32;
+setAttr perspShape.coi 10.9;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "glassMetalCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 128;
+setAttr defaultRenderGlobals.bounces 8;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+setAttr defaultRenderGlobals.background 0.05 0.055 0.065;

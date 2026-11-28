@@ -1,0 +1,152 @@
+// @name HumanIK Skeleton
+// @description A HumanIK biped built with hikCreateSkeleton (which also creates its character definition), dressed with a constrained wooden-mannequin proxy and keyed into a friendly wave over frames 1-60.
+// @kind scene
+
+// ---- the HumanIK skeleton and its character definition ----
+string $ch = `hikCreateSkeleton -n Mannequin -h 4 -f 0`;
+string $hipsSel[] = `ls -sl`;
+string $hips = $hipsSel[0];
+// lift the whole skeleton so the feet stand on top of the plinth instead of inside it
+move -r 0 0.15 0 $hips;
+
+// ---- stage ----
+string $floor[] = `polyPlane -w 24 -h 24 -sx 1 -sy 1 -n hikFloor`;
+string $wall[] = `polyPlane -w 24 -h 12 -sx 1 -sy 1 -n hikWall`;
+xform -ws -t 0 6 -3 -ro 90 0 0 $wall[0];
+string $disc[] = `polyCylinder -r 1.1 -h 0.12 -sa 48 -n hikPlinth`;
+xform -ws -t 0 0.06 0 $disc[0];
+
+// ---- materials ----
+string $mWood = `shadingNode -asShader standardSurface -n hikWoodMat`;
+setAttr ($mWood + ".baseColor") -type double3 0.78 0.55 0.32;
+setAttr ($mWood + ".specularRoughness") 0.45;
+string $mJoint = `shadingNode -asShader standardSurface -n hikJointMat`;
+setAttr ($mJoint + ".baseColor") -type double3 0.25 0.16 0.1;
+setAttr ($mJoint + ".specularRoughness") 0.3;
+string $mFloor = `shadingNode -asShader lambert -n hikFloorMat`;
+setAttr ($mFloor + ".color") -type double3 0.42 0.43 0.46;
+string $mWall = `shadingNode -asShader lambert -n hikWallMat`;
+setAttr ($mWall + ".color") -type double3 0.34 0.4 0.48;
+string $mPlinth = `shadingNode -asShader standardSurface -n hikPlinthMat`;
+setAttr ($mPlinth + ".baseColor") -type double3 0.1 0.11 0.13;
+setAttr ($mPlinth + ".specularRoughness") 0.35;
+
+// ---- mannequin limbs: one cylinder per bone, held between its two joints by constraints ----
+string $pa[] = {"Hips", "Spine1", "Neck", "LeftArm", "LeftForeArm", "RightArm", "RightForeArm", "LeftUpLeg", "LeftLeg", "LeftFoot", "RightUpLeg", "RightLeg", "RightFoot"};
+string $pb[] = {"Spine1", "Neck", "Head", "LeftForeArm", "LeftHand", "RightForeArm", "RightHand", "LeftLeg", "LeftFoot", "LeftToeBase", "RightLeg", "RightFoot", "RightToeBase"};
+float $pr[] = {0.26, 0.24, 0.07, 0.085, 0.07, 0.085, 0.07, 0.12, 0.095, 0.07, 0.12, 0.095, 0.07};
+string $parts[];
+int $n = 0;
+for ($i = 0; $i < size($pa); $i++) {
+    string $ja = $ch + "_" + $pa[$i];
+    string $jb = $ch + "_" + $pb[$i];
+    select -r $ja;
+    float $p0[] = `xform -q -ws -t`;
+    select -r $jb;
+    float $p1[] = `xform -q -ws -t`;
+    float $dx = $p1[0] - $p0[0];
+    float $dy = $p1[1] - $p0[1];
+    float $dz = $p1[2] - $p0[2];
+    float $len = sqrt($dx * $dx + $dy * $dy + $dz * $dz);
+    string $b[] = `polyCylinder -r $pr[$i] -h $len -sa 24 -sy 1 -sc 1 -n ("hikBone_" + $pa[$i])`;
+    pointConstraint $ja $jb $b[0];
+    aimConstraint -aim 0 1 0 $jb $b[0];
+    select -r $b[0];
+    hyperShade -assign $mWood;
+    $parts[$n] = $b[0];
+    $n++;
+}
+
+// ---- ball joints, head and pelvis ----
+string $bj[] = {"LeftArm", "LeftForeArm", "LeftHand", "RightArm", "RightForeArm", "RightHand", "LeftUpLeg", "LeftLeg", "LeftFoot", "RightUpLeg", "RightLeg", "RightFoot", "Neck"};
+float $br[] = {0.12, 0.1, 0.11, 0.12, 0.1, 0.11, 0.15, 0.12, 0.09, 0.15, 0.12, 0.09, 0.1};
+for ($i = 0; $i < size($bj); $i++) {
+    string $s[] = `polySphere -r $br[$i] -sx 20 -sy 14 -n ("hikBall_" + $bj[$i])`;
+    pointConstraint ($ch + "_" + $bj[$i]) $s[0];
+    select -r $s[0];
+    hyperShade -assign $mJoint;
+    $parts[$n] = $s[0];
+    $n++;
+}
+string $head[] = `polySphere -r 0.26 -sx 24 -sy 18 -n hikHead`;
+select -r ($ch + "_Head");
+float $hp[] = `xform -q -ws -t`;
+xform -ws -t $hp[0] ($hp[1] + 0.17) $hp[2] -s 0.9 1.1 0.95 $head[0];
+parentConstraint -mo ($ch + "_Head") $head[0];
+select -r $head[0];
+hyperShade -assign $mWood;
+$parts[$n] = $head[0];
+$n++;
+string $pelvis[] = `polySphere -r 0.3 -sx 24 -sy 16 -n hikPelvis`;
+select -r $hips;
+float $pp[] = `xform -q -ws -t`;
+xform -ws -t $pp[0] ($pp[1] - 0.04) $pp[2] -s 1.15 0.75 0.85 $pelvis[0];
+parentConstraint -mo $hips $pelvis[0];
+select -r $pelvis[0];
+hyperShade -assign $mJoint;
+$parts[$n] = $pelvis[0];
+$n++;
+
+select -r $floor[0];
+hyperShade -assign $mFloor;
+select -r $wall[0];
+hyperShade -assign $mWall;
+select -r $disc[0];
+hyperShade -assign $mPlinth;
+
+// ---- animation: right arm rests, left arm waves, a little sway in the spine (frames 1-60) ----
+string $lArm = $ch + "_LeftArm";
+string $lFore = $ch + "_LeftForeArm";
+string $rArm = $ch + "_RightArm";
+string $spine = $ch + "_Spine";
+setKeyframe -t 1 -v -70 ($rArm + ".rotateZ");
+setKeyframe -t 60 -v -70 ($rArm + ".rotateZ");
+setKeyframe -t 1 -v 60 ($lArm + ".rotateZ");
+setKeyframe -t 60 -v 60 ($lArm + ".rotateZ");
+setKeyframe -t 1 -v 70 ($lFore + ".rotateZ");
+setKeyframe -t 15 -v 20 ($lFore + ".rotateZ");
+setKeyframe -t 30 -v 70 ($lFore + ".rotateZ");
+setKeyframe -t 45 -v 20 ($lFore + ".rotateZ");
+setKeyframe -t 60 -v 70 ($lFore + ".rotateZ");
+setKeyframe -t 1 -v 0 ($spine + ".rotateX");
+setKeyframe -t 30 -v 6 ($spine + ".rotateX");
+setKeyframe -t 60 -v 0 ($spine + ".rotateX");
+
+// ---- lights: warm key from the front right, cool fill from the front left, dim sky ----
+string $key = `areaLight -n hikKeyLight -i 11`;
+xform -ws -t 4 6.5 5 -ro -35 39 0 -s 1.2 1.2 1 $key;
+setAttr ($key + ".color") -type double3 1 0.93 0.84;
+string $fill = `areaLight -n hikFillLight -i 3`;
+xform -ws -t -6 5 6 -ro -20 -45 0 -s 1.5 1.5 1 $fill;
+setAttr ($fill + ".color") -type double3 0.75 0.85 1;
+string $sky = `skyDomeLight -n hikSky -i 0.12`;
+setAttr ($sky + ".color") -type double3 0.8 0.85 1;
+// a dome lights from everywhere; tuck its icon under the floor
+xform -ws -t 0 -2 0 $sky;
+
+// ---- render camera: three-quarter view from the front right ----
+string $cam[] = `camera -n hikCam -fl 55`;
+xform -ws -t 3.63 3.51 11.37 -ro -5.7 17.5 0 $cam[0];
+setAttr ($cam[1] + ".coi") 12;
+
+select -r $parts;
+select -add $hips $floor[0] $wall[0] $disc[0] $key $fill $sky $cam[0];
+group -n HumanIKSkeleton;
+select -cl;
+
+// @settings
+// just in front of the render camera, so its icon stays out of the view
+xform -ws -t 3.33 3.41 10.42 -ro -5.7 17.5 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 11;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "hikCam";
+setAttr defaultResolution.width 512;
+setAttr defaultResolution.height 512;
+setAttr defaultRenderGlobals.samples 160;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+// lights are kept moderate so the viewport is not blown out; exposure brings the render back up
+setAttr defaultRenderGlobals.exposure 1;
+playbackOptions -min 1 -max 60 -ast 1 -aet 60;
+currentTime 1;

@@ -1,0 +1,102 @@
+// @name Studio Three-Point
+// @description A product shot of a glossy red sphere with a gold ring on a plinth, set on a seamless curved cyclorama and lit with a classic three-point setup: a large soft key area light front left, a dimmer cool fill area light front right and a spotlight rim from behind.
+// @kind scene
+
+// ---- seamless cyclorama: an L-shaped profile with a rounded cove, lofted across X ----
+string $profA = `curve -d 1 -p -24 0 8 -p -24 0 -3 -p -24 0.038 -3.434 -p -24 0.151 -3.855 -p -24 0.335 -4.25 -p -24 0.585 -4.607 -p -24 0.893 -4.915 -p -24 1.25 -5.165 -p -24 1.645 -5.349 -p -24 2.066 -5.462 -p -24 2.5 -5.5 -p -24 9 -5.5 -n cycProfileA`;
+string $profB = `curve -d 1 -p 24 0 8 -p 24 0 -3 -p 24 0.038 -3.434 -p 24 0.151 -3.855 -p 24 0.335 -4.25 -p 24 0.585 -4.607 -p 24 0.893 -4.915 -p 24 1.25 -5.165 -p 24 1.645 -5.349 -p 24 2.066 -5.462 -p 24 2.5 -5.5 -p 24 9 -5.5 -n cycProfileB`;
+string $cycRes[] = `loft $profA $profB`;
+string $cyc = $cycRes[0];
+delete -ch $cyc;
+delete $profA $profB;
+$cyc = `rename $cyc "cyclorama"`;
+
+// ---- hero: a glossy sphere on a plinth, wrapped by a gold ring ----
+string $plinth[] = `polyCylinder -r 1.1 -h 0.5 -sa 48 -n plinth`;
+xform -ws -t 0 0.25 0 $plinth[0];
+string $ball[] = `polySphere -r 0.85 -sa 48 -sh 32 -n heroSphere`;
+xform -ws -t 0 1.35 0 $ball[0];
+string $ring[] = `polyTorus -r 1.15 -sr 0.06 -sa 64 -sh 16 -n heroRing`;
+// tilted like a planet ring, clear of the plinth top
+xform -ws -t 0 1.35 0 -ro 25 0 18 $ring[0];
+string $bead[] = `polySphere -r 0.3 -sa 32 -sh 24 -n chromeBead`;
+xform -ws -t 1.75 0.3 1.0 $bead[0];
+
+// ---- materials ----
+string $cycMat = `shadingNode -asShader lambert -n studioBackdrop`;
+setAttr ($cycMat + ".color") -type double3 0.58 0.57 0.55;
+setAttr ($cycMat + ".diffuse") 1;
+string $plinthMat = `shadingNode -asShader lambert -n plinthMatte`;
+setAttr ($plinthMat + ".color") -type double3 0.2 0.2 0.22;
+setAttr ($plinthMat + ".diffuse") 1;
+string $heroMat = `shadingNode -asShader standardSurface -n heroGloss`;
+setAttr ($heroMat + ".baseColor") -type double3 0.75 0.06 0.04;
+setAttr ($heroMat + ".specularRoughness") 0.08;
+setAttr ($heroMat + ".coat") 1;
+setAttr ($heroMat + ".coatRoughness") 0.03;
+string $goldMat = `shadingNode -asShader standardSurface -n ringGold`;
+setAttr ($goldMat + ".baseColor") -type double3 1 0.77 0.34;
+setAttr ($goldMat + ".metalness") 1;
+setAttr ($goldMat + ".specularRoughness") 0.22;
+string $chromeMat = `shadingNode -asShader standardSurface -n beadChrome`;
+setAttr ($chromeMat + ".baseColor") -type double3 0.95 0.95 0.95;
+setAttr ($chromeMat + ".metalness") 1;
+setAttr ($chromeMat + ".specularRoughness") 0.05;
+
+select -r $cyc;
+hyperShade -assign $cycMat;
+select -r $plinth[0];
+hyperShade -assign $plinthMat;
+select -r $ball[0];
+hyperShade -assign $heroMat;
+select -r $ring[0];
+hyperShade -assign $goldMat;
+select -r $bead[0];
+hyperShade -assign $chromeMat;
+
+// ---- key: big soft area light, front left, aimed at the hero ----
+// 2.4 x 2.4 units (size = 2 * scale)
+string $key = `areaLight -n keyLight -i 8`;
+xform -ws -t -5 6.5 2.5 -ro -42.6 -63.4 0 -s 1.2 1.2 1 $key;
+setAttr ($key + ".color") -type double3 1 0.95 0.88;
+
+// ---- fill: dimmer, cooler area light, front right, low ----
+string $fill = `areaLight -n fillLight -i 4`;
+xform -ws -t 5 2.5 4 -ro -11.5 51.3 0 -s 0.65 0.65 1 $fill;
+setAttr ($fill + ".color") -type double3 0.8 0.88 1;
+
+// ---- rim: spotlight from behind, skimming the hero's edges ----
+string $rim = `spotLight -n rimLight -i 2`;
+xform -ws -t 2.5 4.5 -3.5 -ro -26.1 144.5 0 $rim;
+setAttr ($rim + ".color") -type double3 1 0.97 0.92;
+setAttr ($rim + ".coneAngle") 22;
+setAttr ($rim + ".penumbraAngle") 6;
+
+// ---- a dim neutral dome: studio ambience and something for the metals to reflect ----
+string $amb = `skyDomeLight -n studioAmbience -i 0.2`;
+setAttr ($amb + ".color") -type double3 0.9 0.9 0.92;
+// a dome has no position: park its icon behind the cyclorama
+xform -ws -t 0 0 -7 $amb;
+
+// ---- render camera ----
+string $cam[] = `camera -n studioCam -fl 45`;
+xform -ws -t 0 2.0 9.5 -ro -5.4 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 9.5;
+
+group -n StudioThreePoint $cyc $plinth[0] $ball[0] $ring[0] $bead[0] $key $fill $rim $amb $cam[0];
+select -cl;
+
+// @settings
+// close on the product; the light icons sit around the edge of the view
+xform -ws -t 2.6 3.4 8.2 -ro -14 17.6 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 8.9;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "studioCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 128;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+// lights are kept moderate so the viewport is not blown out; exposure brings the render back up
+setAttr defaultRenderGlobals.exposure 1;

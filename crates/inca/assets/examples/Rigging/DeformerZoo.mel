@@ -1,0 +1,171 @@
+// @name Deformer Zoo
+// @description One of each nonlinear deformer (bend, twist, flare, sine, squash and wave) on its own subdivided object, every one driven by a keyed attribute on the zooControls locator so the whole row animates over frames 1-60.
+// @kind scene
+
+// ---- stage ----
+string $floor[] = `polyPlane -w 40 -h 20 -sx 1 -sy 1 -n zooFloor`;
+string $wall[] = `polyPlane -w 40 -h 12 -sx 1 -sy 1 -n zooWall`;
+xform -ws -t 0 6 -4 -ro 90 0 0 $wall[0];
+
+// ---- the six subjects, left to right; plenty of spans along the deformer axis ----
+string $bendObj[] = `polyCylinder -r 0.4 -h 3 -sa 24 -sy 40 -sc 1 -n bendCylinder`;
+xform -ws -t -6.5 1.5 0 $bendObj[0];
+string $twistObj[] = `polyCube -w 0.9 -h 3 -d 0.9 -sx 3 -sy 40 -sz 3 -n twistBar`;
+xform -ws -t -3.9 1.5 0 $twistObj[0];
+string $flareObj[] = `polyCylinder -r 0.45 -h 3 -sa 24 -sy 40 -sc 1 -n flareCylinder`;
+xform -ws -t -1.3 1.5 0 $flareObj[0];
+string $sineObj[] = `polyCylinder -r 0.3 -h 3 -sa 20 -sy 60 -sc 1 -n sineCylinder`;
+xform -ws -t 1.3 1.5 0 $sineObj[0];
+string $squashObj[] = `polySphere -r 1 -sx 32 -sy 32 -n squashBall`;
+xform -ws -t 3.9 1 0 $squashObj[0];
+string $waveBase[] = `polyCube -w 2.8 -h 0.6 -d 2.8 -n waveStand`;
+xform -ws -t 6.6 0.3 0 $waveBase[0];
+string $waveObj[] = `polyPlane -w 2.6 -h 2.6 -sx 60 -sy 60 -n wavePlane`;
+xform -ws -t 6.6 0.75 0 $waveObj[0];
+
+// ---- the control: one locator whose keyed custom attributes drive every deformer ----
+string $ctl[] = `spaceLocator -p 0 0 0 -n zooControls`;
+xform -ws -t 0 0.01 2.2 -s 0.6 0.6 0.6 $ctl[0];
+addAttr -ln "bendCurvature" -at double -k 1 $ctl[0];
+addAttr -ln "twistAngle" -at double -k 1 $ctl[0];
+addAttr -ln "flareCurve" -at double -k 1 $ctl[0];
+addAttr -ln "sineOffset" -at double -k 1 $ctl[0];
+addAttr -ln "squashFactor" -at double -k 1 $ctl[0];
+addAttr -ln "waveOffset" -at double -k 1 $ctl[0];
+
+// ---- deformers (each call returns {deformer, handle}) ----
+select -r $bendObj[0];
+string $bend[] = `nonLinear -type bend`;
+connectAttr ($ctl[0] + ".bendCurvature") ($bend[0] + ".curvature");
+
+select -r $twistObj[0];
+string $twist[] = `nonLinear -type twist`;
+connectAttr ($ctl[0] + ".twistAngle") ($twist[0] + ".endAngle");
+
+select -r $flareObj[0];
+string $flare[] = `nonLinear -type flare`;
+setAttr ($flare[0] + ".endFlareX") 0.6;
+setAttr ($flare[0] + ".endFlareZ") 0.6;
+connectAttr ($ctl[0] + ".flareCurve") ($flare[0] + ".curve");
+
+select -r $sineObj[0];
+string $sine[] = `nonLinear -type sine`;
+setAttr ($sine[0] + ".amplitude") 0.22;
+setAttr ($sine[0] + ".wavelength") 1;
+connectAttr ($ctl[0] + ".sineOffset") ($sine[0] + ".offset");
+
+select -r $squashObj[0];
+string $squash[] = `nonLinear -type squash`;
+connectAttr ($ctl[0] + ".squashFactor") ($squash[0] + ".factor");
+
+// a flat plane has no height, so size the wave handle by hand (radius 1 = 1.3 units)
+select -r $waveObj[0];
+string $wave[] = `nonLinear -type wave`;
+xform -s 1.3 1.3 1.3 $wave[1];
+setAttr ($wave[0] + ".amplitude") 0.1;
+setAttr ($wave[0] + ".wavelength") 0.45;
+setAttr ($wave[0] + ".dropoff") 0.6;
+connectAttr ($ctl[0] + ".waveOffset") ($wave[0] + ".offset");
+
+// ---- keys, frames 1-60 (first and last match so it loops) ----
+string $c = $ctl[0];
+setKeyframe -t 1 -v 0 ($c + ".bendCurvature");
+setKeyframe -t 30 -v 1.3 ($c + ".bendCurvature");
+setKeyframe -t 60 -v 0 ($c + ".bendCurvature");
+setKeyframe -t 1 -v 0 ($c + ".twistAngle");
+setKeyframe -t 30 -v 180 ($c + ".twistAngle");
+setKeyframe -t 60 -v 0 ($c + ".twistAngle");
+setKeyframe -t 1 -v 0 ($c + ".flareCurve");
+setKeyframe -t 30 -v 1.2 ($c + ".flareCurve");
+setKeyframe -t 60 -v 0 ($c + ".flareCurve");
+setKeyframe -t 1 -v 0 ($c + ".sineOffset");
+setKeyframe -t 20 -v 4.18879 ($c + ".sineOffset");
+setKeyframe -t 40 -v 8.37758 ($c + ".sineOffset");
+setKeyframe -t 60 -v 12.56637 ($c + ".sineOffset");
+setKeyframe -t 1 -v 0 ($c + ".squashFactor");
+setKeyframe -t 20 -v -0.5 ($c + ".squashFactor");
+setKeyframe -t 40 -v 0.5 ($c + ".squashFactor");
+setKeyframe -t 60 -v 0 ($c + ".squashFactor");
+setKeyframe -t 1 -v 0 ($c + ".waveOffset");
+setKeyframe -t 20 -v -4.18879 ($c + ".waveOffset");
+setKeyframe -t 40 -v -8.37758 ($c + ".waveOffset");
+setKeyframe -t 60 -v -12.56637 ($c + ".waveOffset");
+
+// ---- materials: one colour per deformer ----
+string $mFloor = `shadingNode -asShader lambert -n zooFloorMat`;
+setAttr ($mFloor + ".color") -type double3 0.4 0.41 0.44;
+string $mWall = `shadingNode -asShader lambert -n zooWallMat`;
+setAttr ($mWall + ".color") -type double3 0.36 0.4 0.47;
+string $mStand = `shadingNode -asShader standardSurface -n zooStandMat`;
+setAttr ($mStand + ".baseColor") -type double3 0.12 0.13 0.15;
+setAttr ($mStand + ".specularRoughness") 0.4;
+
+string $mBend = `shadingNode -asShader standardSurface -n zooBendMat`;
+setAttr ($mBend + ".baseColor") -type double3 0.85 0.2 0.15;
+string $mTwist = `shadingNode -asShader standardSurface -n zooTwistMat`;
+setAttr ($mTwist + ".baseColor") -type double3 0.95 0.55 0.1;
+string $mFlare = `shadingNode -asShader standardSurface -n zooFlareMat`;
+setAttr ($mFlare + ".baseColor") -type double3 0.9 0.8 0.15;
+string $mSine = `shadingNode -asShader standardSurface -n zooSineMat`;
+setAttr ($mSine + ".baseColor") -type double3 0.2 0.7 0.3;
+string $mSquash = `shadingNode -asShader standardSurface -n zooSquashMat`;
+setAttr ($mSquash + ".baseColor") -type double3 0.15 0.45 0.9;
+string $mWave = `shadingNode -asShader standardSurface -n zooWaveMat`;
+setAttr ($mWave + ".baseColor") -type double3 0.55 0.25 0.85;
+setAttr ($mWave + ".specularRoughness") 0.25;
+
+select -r $floor[0];
+hyperShade -assign $mFloor;
+select -r $wall[0];
+hyperShade -assign $mWall;
+select -r $waveBase[0];
+hyperShade -assign $mStand;
+select -r $bendObj[0];
+hyperShade -assign $mBend;
+select -r $twistObj[0];
+hyperShade -assign $mTwist;
+select -r $flareObj[0];
+hyperShade -assign $mFlare;
+select -r $sineObj[0];
+hyperShade -assign $mSine;
+select -r $squashObj[0];
+hyperShade -assign $mSquash;
+select -r $waveObj[0];
+hyperShade -assign $mWave;
+
+// ---- lights: a broad warm key from the front right, cool fill from the left, dim sky ----
+string $key = `areaLight -n zooKeyLight -i 12`;
+xform -ws -t 4 12 4 -ro -62 45 0 -s 2 2 1 $key;
+setAttr ($key + ".color") -type double3 1 0.93 0.84;
+string $fill = `areaLight -n zooFillLight -i 5`;
+xform -ws -t -12 6 8 -ro -19 -51 0 -s 2 2 1 $fill;
+setAttr ($fill + ".color") -type double3 0.75 0.85 1;
+string $sky = `skyDomeLight -n zooSky -i 0.12`;
+setAttr ($sky + ".color") -type double3 0.8 0.85 1;
+// a dome lights from everywhere; tuck its icon inside the wave stand
+xform -ws -t 6.6 0.1 0 $sky;
+
+// ---- render camera: straight on, the whole row (centred on it: the wave stand reaches further right) ----
+string $cam[] = `camera -n zooCam -fl 35`;
+xform -ws -t 0.8 4.2 18.8 -ro -8.4 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 18.5;
+
+group -n DeformerZoo $floor[0] $wall[0] $bendObj[0] $twistObj[0] $flareObj[0] $sineObj[0] $squashObj[0] $waveBase[0] $waveObj[0] $bend[1] $twist[1] $flare[1] $sine[1] $squash[1] $wave[1] $ctl[0] $key $fill $sky $cam[0];
+select -cl;
+
+// @settings
+// just in front of the render camera, so its icon stays out of the view
+xform -ws -t 0.8 4 17.6 -ro -8.4 0 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 17.2;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "zooCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 160;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+// lights are kept moderate so the viewport is not blown out; exposure brings the render back up
+setAttr defaultRenderGlobals.exposure 1;
+playbackOptions -min 1 -max 60 -ast 1 -aet 60;
+currentTime 1;

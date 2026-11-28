@@ -1,0 +1,125 @@
+// @name IK Arm Chain
+// @description A three-joint arm driven by a rotate-plane IK handle with a pole vector: only the handle is keyed, and the smooth-skinned arm mesh bends at the elbow as it reaches up, forward and down over frames 1-60.
+// @kind scene
+
+// ---- stage: floor, back wall and a pedestal for the shoulder ----
+string $floor[] = `polyPlane -w 48 -h 32 -sx 1 -sy 1 -n armFloor`;
+string $wall[] = `polyPlane -w 48 -h 14 -sx 1 -sy 1 -n armWall`;
+xform -ws -t 0 7 -4 -ro 90 0 0 $wall[0];
+string $base[] = `polyCylinder -r 0.7 -h 3 -sa 32 -n shoulderPedestal`;
+xform -ws -t -2.5 1.5 0 $base[0];
+
+// ---- the arm mesh: one long cylinder along +X with many height spans so it bends smoothly ----
+string $arm[] = `polyCylinder -r 0.32 -h 4.6 -sa 24 -sy 40 -sc 1 -n armMesh`;
+xform -ws -ro 0 0 -90 $arm[0];
+makeIdentity -a 1 -r 1 $arm[0];
+xform -ws -t -0.2 3.3 0 $arm[0];
+makeIdentity -a 1 -t 1 $arm[0];
+string $hand[] = `polySphere -r 0.45 -sx 24 -sy 16 -n armHand`;
+xform -ws -t 2.3 3.3 0 $hand[0];
+makeIdentity -a 1 -t 1 $hand[0];
+string $shoulderBall[] = `polySphere -r 0.5 -sx 24 -sy 16 -n armShoulderBall`;
+xform -ws -t -2.5 3.3 0 $shoulderBall[0];
+
+// ---- skeleton: shoulder -> elbow -> wrist (slight bend back so the RP solver knows which way to fold) ----
+select -cl;
+string $j1 = `joint -p -2.5 3.3 0 -rad 0.4 -n armShoulder`;
+string $j2 = `joint -p 0 3.3 -0.3 -rad 0.4 -n armElbow`;
+string $j3 = `joint -p 2.3 3.3 0 -rad 0.4 -n armWrist`;
+select -r $j1;
+joint -e -oj xyz -sao yup;
+
+// ---- rotate-plane IK from shoulder to wrist, pole vector behind the elbow ----
+string $ik[] = `ikHandle -sj $j1 -ee $j3 -sol ikRPsolver -n armIK`;
+string $pole[] = `spaceLocator -p 0 0 0 -n armPole`;
+xform -ws -t 0 3.3 -3 $pole[0];
+select -r $pole[0] $ik[0];
+poleVectorConstraint;
+
+// ---- smooth bind: the arm to the whole chain, the hand ball to the wrist only ----
+select -r $j1 $arm[0];
+skinCluster -mi 2;
+select -r $j3 $hand[0];
+skinCluster -mi 1;
+
+// ---- materials ----
+string $mFloor = `shadingNode -asShader lambert -n armFloorMat`;
+string $chk = `shadingNode -asTexture checker -n armFloorChecker`;
+setAttr ($chk + ".color1") -type double3 0.62 0.63 0.66;
+setAttr ($chk + ".color2") -type double3 0.45 0.46 0.5;
+connectAttr ($chk + ".outColor") ($mFloor + ".color");
+string $chkPlace[] = `listConnections ($chk + ".uvCoord")`;
+setAttr ($chkPlace[0] + ".repeatU") 24;
+setAttr ($chkPlace[0] + ".repeatV") 16;
+string $mWall = `shadingNode -asShader lambert -n armWallMat`;
+setAttr ($mWall + ".color") -type double3 0.55 0.6 0.68;
+string $mBase = `shadingNode -asShader standardSurface -n armPedestalMat`;
+setAttr ($mBase + ".baseColor") -type double3 0.12 0.13 0.15;
+setAttr ($mBase + ".specularRoughness") 0.35;
+string $mArm = `shadingNode -asShader standardSurface -n armSkinMat`;
+setAttr ($mArm + ".baseColor") -type double3 0.9 0.42 0.12;
+setAttr ($mArm + ".specularRoughness") 0.3;
+string $mHand = `shadingNode -asShader standardSurface -n armHandMat`;
+setAttr ($mHand + ".baseColor") -type double3 0.95 0.95 0.95;
+setAttr ($mHand + ".metalness") 1;
+setAttr ($mHand + ".specularRoughness") 0.2;
+
+select -r $floor[0];
+hyperShade -assign $mFloor;
+select -r $wall[0];
+hyperShade -assign $mWall;
+select -r $base[0] $shoulderBall[0];
+hyperShade -assign $mBase;
+select -r $arm[0];
+hyperShade -assign $mArm;
+select -r $hand[0];
+hyperShade -assign $mHand;
+
+// ---- animation: the IK handle reaches up, forward, down and back (frames 1-60) ----
+// Only the handle is keyed; the solver works out the shoulder and elbow every frame.
+float $kt[] = {1, 15, 30, 45, 60};
+float $kx[] = {2.3, 0.6, 1.0, 1.4, 2.3};
+float $ky[] = {3.3, 5.7, 4.3, 1.6, 3.3};
+float $kz[] = {0, 0.8, 2.6, 1.6, 0};
+for ($i = 0; $i < 5; $i++) {
+    setKeyframe -at translateX -t $kt[$i] -v $kx[$i] $ik[0];
+    setKeyframe -at translateY -t $kt[$i] -v $ky[$i] $ik[0];
+    setKeyframe -at translateZ -t $kt[$i] -v $kz[$i] $ik[0];
+}
+
+// ---- lights: warm key from the front right, cool fill from the front left, dim sky ----
+string $key = `areaLight -n armKeyLight -i 20`;
+xform -ws -t 4 8.5 5 -ro -39 42 0 -s 1.2 1.2 1 $key;
+setAttr ($key + ".color") -type double3 1 0.93 0.84;
+string $fill = `areaLight -n armFillLight -i 6`;
+xform -ws -t -7 6 6 -ro -18 -48 0 -s 1.5 1.5 1 $fill;
+setAttr ($fill + ".color") -type double3 0.75 0.85 1;
+string $sky = `skyDomeLight -n armSky -i 0.12`;
+setAttr ($sky + ".color") -type double3 0.8 0.85 1;
+// a dome lights from everywhere; tuck its icon inside the pedestal
+xform -ws -t -2.5 0.5 0 $sky;
+
+// ---- render camera: three-quarter view from the front right ----
+string $cam[] = `camera -n armCam -fl 35`;
+xform -ws -t 6.16 5.97 13.71 -ro -10 25 0 $cam[0];
+setAttr ($cam[1] + ".coi") 14.8;
+
+group -n IKArmChain $floor[0] $wall[0] $base[0] $shoulderBall[0] $arm[0] $hand[0] $j1 $ik[0] $pole[0] $key $fill $sky $cam[0];
+select -cl;
+
+// @settings
+// just in front of the render camera, so its icon stays out of the view
+xform -ws -t 5.74 5.8 12.82 -ro -10 25 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 13.8;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "armCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 160;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+// lights are kept moderate so the viewport is not blown out; exposure brings the render back up
+setAttr defaultRenderGlobals.exposure 1;
+playbackOptions -min 1 -max 60 -ast 1 -aet 60;
+currentTime 1;

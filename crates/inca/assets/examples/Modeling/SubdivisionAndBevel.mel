@@ -1,0 +1,133 @@
+// @name Subdivision And Bevel
+// @description Polygon modeling operations side by side, each labelled with its command: a beveled cube, a per-face extrusion, the same extrusion smoothed with polySmooth, and a cube minus a sphere made with polyCBoolOp.
+// @kind scene
+
+// ---- materials ----
+string $mBevel = `shadingNode -asShader standardSurface -n bevelOrange`;
+setAttr ($mBevel + ".baseColor") -type double3 0.85 0.38 0.10;
+setAttr ($mBevel + ".specularRoughness") 0.3;
+
+string $mExtrude = `shadingNode -asShader standardSurface -n extrudeTeal`;
+setAttr ($mExtrude + ".baseColor") -type double3 0.08 0.52 0.55;
+setAttr ($mExtrude + ".specularRoughness") 0.3;
+
+string $mSmooth = `shadingNode -asShader standardSurface -n smoothViolet`;
+setAttr ($mSmooth + ".baseColor") -type double3 0.42 0.26 0.72;
+setAttr ($mSmooth + ".specularRoughness") 0.22;
+setAttr ($mSmooth + ".coat") 0.4;
+
+string $mBool = `shadingNode -asShader standardSurface -n booleanSteel`;
+setAttr ($mBool + ".baseColor") -type double3 0.72 0.74 0.78;
+setAttr ($mBool + ".metalness") 1;
+setAttr ($mBool + ".specularRoughness") 0.35;
+
+string $mLabel = `shadingNode -asShader lambert -n labelInk`;
+setAttr ($mLabel + ".color") -type double3 0.08 0.08 0.09;
+
+string $mFloor = `shadingNode -asShader lambert -n modelingFloorMat`;
+string $floorTex = `shadingNode -asTexture checker -n modelingFloorChecker`;
+setAttr ($floorTex + ".color1") -type double3 0.78 0.78 0.76;
+setAttr ($floorTex + ".color2") -type double3 0.66 0.66 0.64;
+string $floorPlace[] = `listConnections -s 1 -d 0 ($floorTex + ".uvCoord")`;
+setAttr ($floorPlace[0] + ".repeatU") 12;
+setAttr ($floorPlace[0] + ".repeatV") 8;
+connectAttr ($floorTex + ".outColor") ($mFloor + ".color");
+
+string $mWall = `shadingNode -asShader lambert -n modelingWallMat`;
+setAttr ($mWall + ".color") -type double3 0.70 0.72 0.75;
+
+// ---- 1. polyBevel: every edge of a cube rounded off ----
+string $bevel[] = `polyCube -w 1.6 -h 1.6 -d 1.6 -n bevelCube`;
+polyBevel -f 0.35 $bevel[0];
+move -a -4.2 0.8 0 $bevel[0];
+rotate 0 25 0 $bevel[0];
+select -r $bevel[0];
+hyperShade -assign $mBevel;
+
+// ---- 2. polyExtrudeFacet: each face pushed out separately ----
+string $ext[] = `polyCube -w 1.3 -h 1.3 -d 1.3 -n extrudeCube`;
+polyExtrudeFacet -kft 0 -ltz 0.45 -off 0.15 ($ext[0] + ".f[0:5]");
+// a second, thin extrusion adds a support loop that keeps the edge crisp when smoothed
+polyExtrudeFacet -kft 0 -ltz 0.06 -off 0 ($ext[0] + ".f[0:5]");
+move -a -1.4 1.15 0 $ext[0];
+rotate 0 25 0 $ext[0];
+select -r $ext[0];
+hyperShade -assign $mExtrude;
+
+// ---- 3. polySmooth: the same extruded cube, subdivided twice (Catmull-Clark) ----
+string $smo[] = `polyCube -w 1.3 -h 1.3 -d 1.3 -n smoothCube`;
+polyExtrudeFacet -kft 0 -ltz 0.45 -off 0.15 ($smo[0] + ".f[0:5]");
+polyExtrudeFacet -kft 0 -ltz 0.06 -off 0 ($smo[0] + ".f[0:5]");
+polySmooth -dv 2 $smo[0];
+move -a 1.4 1.15 0 $smo[0];
+rotate 0 25 0 $smo[0];
+select -r $smo[0];
+hyperShade -assign $mSmooth;
+
+// ---- 4. polyCBoolOp: a cube minus a sphere ----
+string $boolA[] = `polyCube -w 1.6 -h 1.6 -d 1.6 -n boolBox`;
+string $boolB[] = `polySphere -r 1.05 -sx 32 -sy 24 -n boolCutter`;
+string $bool[] = `polyCBoolOp -op 2 -n booleanResult $boolA[0] $boolB[0]`;
+delete -ch $bool[0];
+delete $boolA[0] $boolB[0];
+move -a 4.2 0.8 0 $bool[0];
+rotate 0 25 0 $bool[0];
+select -r $bool[0];
+hyperShade -assign $mBool;
+
+// ---- stand every result on the floor (polySmooth shrinks the cage a little) ----
+string $results[] = {$bevel[0], $ext[0], $smo[0], $bool[0]};
+for ($o in $results) {
+    float $bb[] = `xform -q -ws -bb $o`;
+    move -r 0 (-$bb[1]) 0 $o;
+}
+
+// ---- labels (polyType), centred under each object ----
+string $names[] = {"polyBevel", "polyExtrudeFacet", "polySmooth", "polyCBoolOp"};
+float $xs[] = {-4.2, -1.4, 1.4, 4.2};
+string $labels[];
+for ($i = 0; $i < 4; $i++) {
+    string $t[] = `polyType -t $names[$i] -fs 0.27 -d 0.04`;
+    float $bb[] = `polyEvaluate -b $t[0]`;
+    // bb is xmin xmax ymin ymax: lift by -ymin so the descenders of p and y stay above the floor
+    move -r ($xs[$i] - ($bb[0] + $bb[1]) / 2) (0.01 - $bb[2]) 1.7 $t[0];
+    $labels[$i] = $t[0];
+}
+select -r $labels;
+hyperShade -assign $mLabel;
+
+// ---- floor ----
+string $floor[] = `polyPlane -w 40 -h 24 -n modelingFloor`;
+move -r 0 0 4 $floor[0];
+select -r $floor[0];
+hyperShade -assign $mFloor;
+string $wall[] = `polyPlane -w 40 -h 14 -n modelingWall`;
+rotate 90 0 0 $wall[0];
+move -r 0 7 -8 $wall[0];
+select -r $wall[0];
+hyperShade -assign $mWall;
+
+// ---- lights: a big soft key from the front left and a faint sky fill ----
+// a 2 x 2 panel; the +2 stop render exposure below keeps the path tracer as bright as the viewport
+string $key = `areaLight -n modelingKey -i 28`;
+setAttr ($key + ".color") -type double3 1 0.96 0.9;
+xform -ws -t -6 7 3 -ro -50 -60 0 -s 1 1 1 $key;
+string $sky = `skyDomeLight -n modelingSky -i 0.15`;
+setAttr ($sky + ".color") -type double3 0.85 0.9 1;
+// the dome icon sits under the floor, out of sight (its position does not matter)
+move -a 0 -1 0 $sky;
+
+group -n SubdivisionAndBevel $bevel[0] $ext[0] $smo[0] $bool[0] $labels $floor[0] $wall[0] $key $sky;
+select -cl;
+// @settings
+xform -ws -t 0 4.1 13.4 -ro -14 0 0 persp;
+setAttr perspShape.focalLength 36;
+setAttr perspShape.coi 13.8;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "persp";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 160;
+setAttr defaultRenderGlobals.bounces 5;
+setAttr defaultRenderGlobals.exposure 2;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";

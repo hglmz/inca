@@ -1,0 +1,115 @@
+// @name Curves To Surfaces
+// @description NURBS curve workflow: a vase revolved from a profile curve, a goblet lofted through circles, and a tube extruded along a spiral path, in glazed ceramic.
+// @kind scene
+
+// ---- materials: glazed ceramics and a matte backdrop ----
+string $glazeBlue = `shadingNode -asShader standardSurface -n ceramicBlue`;
+setAttr ($glazeBlue + ".baseColor") -type double3 0.12 0.32 0.62;
+setAttr ($glazeBlue + ".specularRoughness") 0.12;
+setAttr ($glazeBlue + ".coat") 0.25;
+setAttr ($glazeBlue + ".coatRoughness") 0.05;
+
+string $glazeCream = `shadingNode -asShader standardSurface -n ceramicCream`;
+setAttr ($glazeCream + ".baseColor") -type double3 0.86 0.80 0.68;
+setAttr ($glazeCream + ".specularRoughness") 0.25;
+setAttr ($glazeCream + ".coat") 0.5;
+setAttr ($glazeCream + ".coatRoughness") 0.08;
+
+string $glazeTerra = `shadingNode -asShader standardSurface -n ceramicTerracotta`;
+setAttr ($glazeTerra + ".baseColor") -type double3 0.72 0.30 0.16;
+setAttr ($glazeTerra + ".specularRoughness") 0.35;
+setAttr ($glazeTerra + ".coat") 0.4;
+setAttr ($glazeTerra + ".coatRoughness") 0.1;
+
+string $backdrop = `shadingNode -asShader lambert -n curvesBackdrop`;
+setAttr ($backdrop + ".color") -type double3 0.72 0.66 0.58;
+
+// ---- 1. revolve: a vase from a profile curve (x = radius, y = height) ----
+string $profile = `curve -d 3 -ep 0.001 0 0 -ep 0.55 0.04 0 -ep 0.82 0.55 0 -ep 0.62 1.35 0 -ep 0.3 1.85 0 -ep 0.32 2.1 0 -ep 0.44 2.25 0 -n vaseProfile`;
+string $vase[] = `revolve -s 24 $profile`;
+setAttr ($vase[1] + ".segments") 12;
+delete -ch $vase[0];
+delete $profile;
+$vase[0] = `rename $vase[0] "revolvedVase"`;
+select -r $vase[0];
+hyperShade -assign $glazeBlue;
+move -r -2.6 0 0 $vase[0];
+
+// ---- 2. loft: a goblet through circles of different radii ----
+// sections listed bottom to top; the loft passes through each circle in order
+string $sections[];
+string $c[];
+$c = `circle -r 0.72 -s 16 -nr 0 1 0 -c 0 0 0`;
+$sections[0] = $c[0];
+$c = `circle -r 0.7 -s 16 -nr 0 1 0 -c 0 0.06 0`;
+$sections[1] = $c[0];
+$c = `circle -r 0.34 -s 16 -nr 0 1 0 -c 0 0.2 0`;
+$sections[2] = $c[0];
+$c = `circle -r 0.14 -s 16 -nr 0 1 0 -c 0 0.4 0`;
+$sections[3] = $c[0];
+$c = `circle -r 0.1 -s 16 -nr 0 1 0 -c 0 0.75 0`;
+$sections[4] = $c[0];
+$c = `circle -r 0.15 -s 16 -nr 0 1 0 -c 0 1.0 0`;
+$sections[5] = $c[0];
+$c = `circle -r 0.42 -s 16 -nr 0 1 0 -c 0 1.2 0`;
+$sections[6] = $c[0];
+$c = `circle -r 0.66 -s 16 -nr 0 1 0 -c 0 1.45 0`;
+$sections[7] = $c[0];
+$c = `circle -r 0.8 -s 16 -nr 0 1 0 -c 0 1.8 0`;
+$sections[8] = $c[0];
+$c = `circle -r 0.84 -s 16 -nr 0 1 0 -c 0 2.15 0`;
+$sections[9] = $c[0];
+string $loft[] = `loft $sections`;
+setAttr ($loft[1] + ".segments") 6;
+delete -ch $loft[0];
+delete $sections;
+$loft[0] = `rename $loft[0] "loftedGoblet"`;
+select -r $loft[0];
+hyperShade -assign $glazeCream;
+
+// ---- 3. extrude: a tube swept along a rising spiral path ----
+// the path is a helix (2.5 turns) whose first point rests on the floor;
+// the circle profile is carried along it, staying perpendicular to the path
+string $path = `curve -d 3 -ep 0 0.16 0.62 -ep 0.438 0.243 0.438 -ep 0.62 0.326 0 -ep 0.438 0.409 -0.438 -ep 0 0.492 -0.62 -ep -0.438 0.575 -0.438 -ep -0.62 0.658 0 -ep -0.438 0.741 0.438 -ep 0 0.824 0.62 -ep 0.438 0.907 0.438 -ep 0.62 0.99 0 -ep 0.438 1.07 -0.438 -ep 0 1.16 -0.62 -ep -0.438 1.24 -0.438 -ep -0.62 1.32 0 -ep -0.438 1.41 0.438 -ep 0 1.49 0.62 -ep 0.438 1.57 0.438 -ep 0.62 1.65 0 -ep 0.438 1.74 -0.438 -ep 0 1.82 -0.62 -n tubePath`;
+string $ring[] = `circle -r 0.13 -s 12 -nr 1 0 0`;
+string $tube[] = `extrude $ring[0] $path`;
+setAttr ($tube[1] + ".segments") 16;
+delete -ch $tube[0];
+delete $ring[0] $path;
+$tube[0] = `rename $tube[0] "extrudedTube"`;
+select -r $tube[0];
+hyperShade -assign $glazeTerra;
+move -r 2.6 0 0 $tube[0];
+
+// ---- backdrop: floor plus a back wall ----
+string $floor[] = `polyPlane -w 30 -h 16 -sx 1 -sy 1 -n curvesFloor`;
+move -r 0 0 2 $floor[0];
+string $wall[] = `polyPlane -w 30 -h 12 -sx 1 -sy 1 -n curvesWall`;
+rotate 90 0 0 $wall[0];
+move -r 0 6 -6 $wall[0];
+select -r $floor[0] $wall[0];
+hyperShade -assign $backdrop;
+
+// ---- lights: a big soft key from above-front-left and a faint sky fill ----
+// a 2 x 2 panel; the +2 stop render exposure below keeps the path tracer as bright as the viewport
+string $key = `areaLight -n curvesKey -i 22`;
+setAttr ($key + ".color") -type double3 1 0.95 0.88;
+xform -ws -t -5 6 5 -ro -45 -45 0 -s 1 1 1 $key;
+string $sky = `skyDomeLight -n curvesSky -i 0.15`;
+setAttr ($sky + ".color") -type double3 0.8 0.87 1;
+// the dome icon sits under the floor, out of sight (its position does not matter)
+move -a 0 -1 0 $sky;
+group -n CurvesToSurfaces $vase[0] $loft[0] $tube[0] $floor[0] $wall[0] $key $sky;
+select -cl;
+// @settings
+xform -ws -t 0 3.6 11.5 -ro -12 0 0 persp;
+setAttr perspShape.focalLength 50;
+setAttr perspShape.coi 11.8;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "persp";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 160;
+setAttr defaultRenderGlobals.bounces 5;
+setAttr defaultRenderGlobals.exposure 2;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
