@@ -1,0 +1,106 @@
+// @name Turntable
+// @description A studio turntable: a gold-and-ceramic sculpture spins a full 360 degrees on its pedestal over frames 1-120 in front of a fixed camera and three-light setup, and the loop repeats seamlessly.
+// @kind scene
+
+// ---- materials ----
+string $ceramic = `shadingNode -asShader standardSurface -n ttCeramic`;
+setAttr ($ceramic + ".baseColor") -type double3 0.9 0.88 0.84;
+setAttr ($ceramic + ".specularRoughness") 0.12;
+string $gold = `shadingNode -asShader standardSurface -n ttGold`;
+setAttr ($gold + ".baseColor") -type double3 1.0 0.76 0.33;
+// metals at 0.85, not 1: a full metal has nothing to reflect in the viewport and shows black
+setAttr ($gold + ".metalness") 0.85;
+setAttr ($gold + ".specularRoughness") 0.18;
+string $copper = `shadingNode -asShader standardSurface -n ttCopper`;
+setAttr ($copper + ".baseColor") -type double3 0.95 0.55 0.4;
+setAttr ($copper + ".metalness") 0.85;
+setAttr ($copper + ".specularRoughness") 0.3;
+string $stone = `shadingNode -asShader standardSurface -n ttPedestal`;
+setAttr ($stone + ".baseColor") -type double3 0.12 0.12 0.13;
+setAttr ($stone + ".specularRoughness") 0.35;
+string $trim = `shadingNode -asShader standardSurface -n ttTrim`;
+setAttr ($trim + ".baseColor") -type double3 0.8 0.8 0.82;
+setAttr ($trim + ".metalness") 0.85;
+setAttr ($trim + ".specularRoughness") 0.35;
+string $floorMat = `shadingNode -asShader lambert -n ttFloor`;
+setAttr ($floorMat + ".color") -type double3 0.3 0.3 0.32;
+
+// ---- floor and pedestal ----
+string $floor[] = `polyPlane -w 60 -h 60 -sx 1 -sy 1 -n floor`;
+select -r $floor[0];
+hyperShade -assign $floorMat;
+string $ped[] = `polyCylinder -r 1.2 -h 1.2 -sa 48 -n pedestal`;
+xform -ws -t 0 0.6 0 $ped[0];
+select -r $ped[0];
+hyperShade -assign $stone;
+string $cap[] = `polyCylinder -r 1.3 -h 0.08 -sa 48 -n pedestalCap`;
+xform -ws -t 0 1.24 0 $cap[0];
+string $foot[] = `polyCylinder -r 1.3 -h 0.08 -sa 48 -n pedestalFoot`;
+xform -ws -t 0 0.04 0 $foot[0];
+select -r $cap[0] $foot[0];
+hyperShade -assign $trim;
+
+// ---- the hero object: a ceramic sphere in a gold spring and a tilted copper ring ----
+string $sph[] = `polySphere -r 0.6 -sx 40 -sy 30 -n heroSphere`;
+xform -ws -t 0 2.15 0 $sph[0];
+select -r $sph[0];
+hyperShade -assign $ceramic;
+string $coil[] = `polyHelix -c 3.5 -h 1.6 -w 1.5 -r 0.06 -sa 12 -sco 60 -n heroSpring`;
+xform -ws -t 0 2.15 0 -ro 0 0 12 $coil[0];
+select -r $coil[0];
+hyperShade -assign $gold;
+string $ring[] = `polyTorus -r 1.0 -sr 0.05 -sa 64 -sh 12 -n heroRing`;
+xform -ws -t 0 2.15 0 -ro 65 30 0 $ring[0];
+string $gem[] = `polyPlatonic -p 2 -r 0.22 -n heroGem`;
+xform -ws -t 0 3.08 0 -ro 20 0 15 $gem[0];
+select -r $ring[0] $gem[0];
+hyperShade -assign $copper;
+// the turntable top spins with the object
+string $hero = `group -n hero $sph[0] $coil[0] $ring[0] $gem[0] $cap[0]`;
+
+// ---- fixed studio: render camera and three lights ----
+string $cam[] = `camera -n turntableCam -fl 50`;
+xform -ws -t 0 2.3 6.8 -ro -4 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 6.8;
+string $key = `areaLight -n ttKey -i 15`;
+xform -ws -t 4 5 4 -ro -38 45 0 -s 1.2 1.2 1 $key;
+setAttr ($key + ".color") -type double3 1 0.93 0.84;
+string $fill = `areaLight -n ttFill -i 5`;
+xform -ws -t -5 2.5 3 -ro -10 -59 0 -s 1.5 1.5 1 $fill;
+setAttr ($fill + ".color") -type double3 0.8 0.88 1;
+string $rim = `areaLight -n ttRim -i 18`;
+xform -ws -t -1.5 4.5 -4.5 -ro -40 -162 0 -s 1 1 1 $rim;
+string $studio = `group -n studio $cam[0] $key $fill $rim`;
+
+// the object's rotateY 0 -> 360. Frame 121 holds 360 (= frame 1), so playing
+// 1-120 loops seamlessly. Evenly spaced keys on a straight line give a constant
+// speed; the keys on 2 and 120 keep the flat end tangents from easing it.
+setKeyframe -at rotateY -t 1 -v 0 $hero;
+setKeyframe -at rotateY -t 2 -v 3 $hero;
+setKeyframe -at rotateY -t 31 -v 90 $hero;
+setKeyframe -at rotateY -t 61 -v 180 $hero;
+setKeyframe -at rotateY -t 91 -v 270 $hero;
+setKeyframe -at rotateY -t 120 -v 357 $hero;
+setKeyframe -at rotateY -t 121 -v 360 $hero;
+
+string $sky = `skyDomeLight -n ttSky -i 0.08`;
+setAttr ($sky + ".color") -type double3 0.6 0.65 0.75;
+
+group -n Turntable $floor[0] $ped[0] $foot[0] $hero $studio $sky;
+select -cl;
+
+// @settings
+xform -ws -t 0 2.6 7.5 -ro -6 0 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 7.5;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "turntableCam";
+setAttr defaultResolution.width 512;
+setAttr defaultResolution.height 512;
+setAttr defaultRenderGlobals.samples 160;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+// lights are kept moderate so the viewport is not blown out; exposure brings the render back up
+setAttr defaultRenderGlobals.exposure 1;
+playbackOptions -min 1 -max 120 -ast 1 -aet 120;
+currentTime 1;

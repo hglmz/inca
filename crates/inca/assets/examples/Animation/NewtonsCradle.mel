@@ -1,0 +1,141 @@
+// @name Newton's Cradle
+// @description Five chrome balls hanging from V-shaped strings: the outer balls swing on rotateZ and pass the impact through the row, keyed frame by frame over 1-96 (three full cycles).
+// @kind scene
+
+// ---- materials ----
+string $chrome = `shadingNode -asShader standardSurface -n ncChrome`;
+setAttr ($chrome + ".baseColor") -type double3 0.92 0.92 0.94;
+// 0.85, not 1: a full metal has nothing to reflect in the viewport and shows black
+setAttr ($chrome + ".metalness") 0.85;
+setAttr ($chrome + ".specularRoughness") 0.08;
+string $steel = `shadingNode -asShader standardSurface -n ncSteel`;
+setAttr ($steel + ".baseColor") -type double3 0.7 0.7 0.72;
+setAttr ($steel + ".metalness") 0.85;
+setAttr ($steel + ".specularRoughness") 0.25;
+string $wood = `shadingNode -asShader standardSurface -n ncBase`;
+setAttr ($wood + ".baseColor") -type double3 0.08 0.05 0.035;
+setAttr ($wood + ".specularRoughness") 0.25;
+string $thread = `shadingNode -asShader lambert -n ncString`;
+setAttr ($thread + ".color") -type double3 0.05 0.05 0.05;
+string $floorMat = `shadingNode -asShader lambert -n ncFloor`;
+setAttr ($floorMat + ".color") -type double3 0.45 0.42 0.38;
+
+// ---- floor and base ----
+string $floor[] = `polyPlane -w 80 -h 80 -sx 1 -sy 1 -n floor`;
+select -r $floor[0];
+hyperShade -assign $floorMat;
+string $base[] = `polyCube -w 5.4 -h 0.3 -d 2.4 -n cradleBase`;
+xform -ws -t 0 0.15 0 $base[0];
+select -r $base[0];
+hyperShade -assign $wood;
+
+// ---- frame: four posts and two top rails (thin cylinders) ----
+string $frameParts[];
+int $n = 0;
+for ($sx = -1; $sx <= 1; $sx += 2) {
+    for ($sz = -1; $sz <= 1; $sz += 2) {
+        string $post[] = `polyCylinder -r 0.05 -h 3.75 -sa 16 -n post`;
+        xform -ws -t ($sx * 2.4) 2.175 ($sz * 0.8) $post[0];
+        $frameParts[$n] = $post[0];
+        $n++;
+    }
+}
+for ($sz = -1; $sz <= 1; $sz += 2) {
+    string $rail[] = `polyCylinder -r 0.05 -h 4.9 -sa 16 -n rail`;
+    xform -ws -t 0 4.05 ($sz * 0.8) -ro 0 0 90 $rail[0];
+    $frameParts[$n] = $rail[0];
+    $n++;
+}
+select -r $frameParts;
+hyperShade -assign $steel;
+string $frame = `group -n cradleFrame $frameParts`;
+
+// ---- five pendulums ----
+// Each pendulum is a group whose pivot sits on the rail axis (y = 4.05), so
+// keying its rotateZ swings the ball and both strings together.
+string $pend[];
+float $len = 2.65;   // pivot to ball centre
+float $r = 0.4;      // ball radius
+float $hang = $len - $r;
+float $strLen = sqrt($hang * $hang + 0.8 * 0.8);
+float $strTilt = atan2(0.8, $hang) * 180.0 / 3.14159265;
+for ($i = 0; $i < 5; $i++) {
+    string $p = `group -em -n pendulum`;
+    xform -ws -t (($i - 2) * 0.8) 4.05 0 $p;
+    string $ball[] = `polySphere -r $r -sx 32 -sy 20 -n cradleBall`;
+    select -r $ball[0];
+    hyperShade -assign $chrome;
+    // parent first, then place in the pendulum's local space
+    parent $ball[0] $p;
+    xform -os -t 0 (-$len) 0 $ball[0];
+    for ($sz = -1; $sz <= 1; $sz += 2) {
+        string $s[] = `polyCylinder -r 0.008 -h $strLen -sa 6 -n cradleString`;
+        select -r $s[0];
+        hyperShade -assign $thread;
+        parent $s[0] $p;
+        xform -os -t 0 (-$hang * 0.5) ($sz * 0.4) -ro ($sz * $strTilt) 0 0 $s[0];
+    }
+    $pend[$i] = $p;
+}
+
+// ---- animation ----
+// One cycle is 32 frames: the left ball falls (8 frames), the right ball swings
+// out and back (16 frames), the left ball swings out again (8 frames).
+// Pendulum motion is a cosine, so each half swing gets keys on frames
+// 0, 4, 6, 7 and 8 of the swing; the extra keys just before impact keep the
+// ball at full speed when it hits instead of easing in.
+float $amp = 35.0;
+float $phase[] = {0.0, 4.0, 6.0, 7.0, 8.0};
+for ($c = 0; $c < 3; $c++) {
+    int $t0 = 1 + $c * 32;
+    for ($k = 0; $k < 5; $k++) {
+        float $w = cos($phase[$k] / 8.0 * 1.5707963);
+        // left ball: falls from the left apex to impact
+        setKeyframe -at rotateZ -t ($t0 + $phase[$k]) -v (-$amp * $w) $pend[0];
+        // right ball: leaves on impact, then returns to impact
+        setKeyframe -at rotateZ -t ($t0 + 8 + 8 - $phase[$k]) -v ($amp * $w) $pend[4];
+        setKeyframe -at rotateZ -t ($t0 + 16 + $phase[$k]) -v ($amp * $w) $pend[4];
+        // left ball: leaves on impact and climbs back to the left apex
+        if ($t0 + 32 - $phase[$k] <= 96)
+            setKeyframe -at rotateZ -t ($t0 + 32 - $phase[$k]) -v (-$amp * $w) $pend[0];
+    }
+}
+// close the range on frame 96 (one frame before the next apex)
+setKeyframe -at rotateZ -t 96 -v (-$amp * cos(1.0 / 8.0 * 1.5707963)) $pend[0];
+// the middle three balls stay at rest: they only pass the impact along
+
+string $cradle = `group -n cradle $base[0] $frame $pend[0] $pend[1] $pend[2] $pend[3] $pend[4]`;
+
+// ---- lights: soft key from the front right, rim from behind, dim sky ----
+string $key = `areaLight -n ncKey -i 20`;
+xform -ws -t 4 6.5 5 -ro -42 38 0 -s 1.5 1.5 1 $key;
+setAttr ($key + ".color") -type double3 1 0.92 0.82;
+string $rim = `areaLight -n ncRim -i 12`;
+xform -ws -t -3 5 -5 -ro -35 -150 0 -s 1.5 1.5 1 $rim;
+setAttr ($rim + ".color") -type double3 0.75 0.85 1;
+string $sky = `skyDomeLight -n ncSky -i 0.12`;
+setAttr ($sky + ".color") -type double3 0.8 0.85 1;
+
+// ---- render camera ----
+string $cam[] = `camera -n cradleCam -fl 50`;
+xform -ws -t 5.5 4.0 11.5 -ro -8 25.6 0 $cam[0];
+setAttr ($cam[1] + ".coi") 13;
+
+group -n NewtonsCradle $floor[0] $cradle $key $rim $sky $cam[0];
+select -cl;
+
+// @settings
+xform -ws -t 6 5 11 -ro -14 28 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 13;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "cradleCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 192;
+setAttr defaultRenderGlobals.bounces 6;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+// lights are kept moderate so the viewport is not blown out; exposure brings the render back up
+setAttr defaultRenderGlobals.exposure 1;
+playbackOptions -min 1 -max 96 -ast 1 -aet 96;
+currentTime 1;

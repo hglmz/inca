@@ -1,0 +1,147 @@
+// @name Bouncing Ball
+// @description The classic animation exercise: a ball bounces across the floor with decreasing height, squashing on every contact and stretching as it falls and rebounds, over frames 1-48.
+// @kind scene
+
+// ---- set: checker floor and a backdrop wall ----
+string $floor[] = `polyPlane -w 40 -h 24 -sx 1 -sy 1 -n floor`;
+string $wall[] = `polyPlane -w 40 -h 16 -sx 1 -sy 1 -n backdrop`;
+xform -ws -t 0 8 -6 -ro 90 0 0 $wall[0];
+
+string $floorMat = `shadingNode -asShader lambert -n bbFloorMat`;
+string $floorTex = `shadingNode -asTexture checker -n bbFloorChecker`;
+setAttr ($floorTex + ".color1") -type double3 0.62 0.60 0.56;
+setAttr ($floorTex + ".color2") -type double3 0.36 0.34 0.32;
+connectAttr ($floorTex + ".outColor") ($floorMat + ".color");
+string $floorPlace[] = `listConnections ($floorTex + ".uvCoord")`;
+setAttr ($floorPlace[0] + ".repeatU") 20;
+setAttr ($floorPlace[0] + ".repeatV") 12;
+string $wallMat = `shadingNode -asShader lambert -n bbWallMat`;
+setAttr ($wallMat + ".color") -type double3 0.22 0.36 0.48;
+select -r $floor[0];
+hyperShade -assign $floorMat;
+select -r $wall[0];
+hyperShade -assign $wallMat;
+
+// ---- the ball: radius 0.5, sitting on its control's origin ----
+// The control's pivot is at the bottom of the ball, so squash and stretch
+// keep the ball touching the floor.
+string $ball[] = `polySphere -r 0.5 -sx 24 -sy 16 -n ball`;
+xform -ws -t 0 0.5 0 $ball[0];
+string $ballMat = `shadingNode -asShader standardSurface -n bbBallMat`;
+setAttr ($ballMat + ".baseColor") -type double3 0.85 0.08 0.05;
+setAttr ($ballMat + ".specularRoughness") 0.3;
+select -r $ball[0];
+hyperShade -assign $ballMat;
+// a white band around the ball shows the roll in every shading mode
+string $band[] = `polyTorus -r 0.5 -sr 0.04 -sa 32 -sh 8 -n ballBand`;
+xform -ws -t 0 0.5 0 -ro 0 0 90 $band[0];
+string $bandMat = `shadingNode -asShader standardSurface -n bbBandMat`;
+setAttr ($bandMat + ".baseColor") -type double3 0.95 0.92 0.85;
+setAttr ($bandMat + ".specularRoughness") 0.3;
+select -r $band[0];
+hyperShade -assign $bandMat;
+parent $band[0] $ball[0];
+string $ctrl = `group -n ballCtrl $ball[0]`;
+
+// ---- animation ----
+// Contact frames and the apex height of the arc that starts at each contact.
+// Arc lengths follow h ~ T^2 (constant gravity): 14, 10, 7 and 5 frames.
+int $contact[] = {10, 24, 34, 41, 46};
+float $apex[] = {2.4, 1.2, 0.6, 0.3, 0.0};
+float $speed[] = {0.21, 0.19, 0.16, 0.14, 0.09};
+float $x = -4.6;
+float $pi = 3.14159265;
+
+for ($f = 1; $f <= 48; $f++) {
+    float $y = 0.0;
+    float $vx = 0.23;
+    if ($f <= $contact[0]) {
+        // first drop from 4 units, released at rest on frame 1
+        float $u = ($f - 1.0) / ($contact[0] - 1.0);
+        $y = 4.0 * (1.0 - $u * $u);
+    } else {
+        for ($i = 0; $i < 4; $i++) {
+            if ($f > $contact[$i] && $f <= $contact[$i + 1]) {
+                float $u = ($f - $contact[$i]) * 1.0 / ($contact[$i + 1] - $contact[$i]);
+                $y = 4.0 * $apex[$i] * $u * (1.0 - $u);
+                $vx = $speed[$i];
+            }
+        }
+        if ($f > $contact[4]) {
+            // rolling to a stop
+            $vx = $speed[4] * (48.0 - $f) / 2.0 + 0.02;
+        }
+    }
+    if ($f > 1)
+        $x = $x + $vx;
+    setKeyframe -at translateX -t $f -v $x $ctrl;
+    setKeyframe -at translateY -t $f -v $y $ctrl;
+    // roll: distance / radius, in degrees (negative Z rotation rolls toward +X)
+    setKeyframe -at rotateZ -t $f -v (-($x + 4.6) / 0.5 * 180.0 / $pi) $ball[0];
+}
+
+// Squash on contact, stretch just before and after; the effect fades with the bounces.
+float $amount[] = {1.0, 0.7, 0.45, 0.25, 0.1};
+setKeyframe -at scaleX -t 1 -v 1 $ctrl;
+setKeyframe -at scaleY -t 1 -v 1 $ctrl;
+setKeyframe -at scaleZ -t 1 -v 1 $ctrl;
+for ($i = 0; $i < 5; $i++) {
+    int $c = $contact[$i];
+    float $a = $amount[$i];
+    float $stretchIn = 1.0 + 0.25 * $a;
+    float $squash = 1.0 - 0.38 * $a;
+    float $stretchOut = 1.0 + 0.18 * $a;
+    float $sIn = 1.0 / sqrt($stretchIn);
+    float $sSq = 1.0 / sqrt($squash);
+    float $sOut = 1.0 / sqrt($stretchOut);
+    setKeyframe -at scaleY -t ($c - 1) -v $stretchIn $ctrl;
+    setKeyframe -at scaleX -t ($c - 1) -v $sIn $ctrl;
+    setKeyframe -at scaleZ -t ($c - 1) -v $sIn $ctrl;
+    setKeyframe -at scaleY -t $c -v $squash $ctrl;
+    setKeyframe -at scaleX -t $c -v $sSq $ctrl;
+    setKeyframe -at scaleZ -t $c -v $sSq $ctrl;
+    setKeyframe -at scaleY -t ($c + 1) -v $stretchOut $ctrl;
+    setKeyframe -at scaleX -t ($c + 1) -v $sOut $ctrl;
+    setKeyframe -at scaleZ -t ($c + 1) -v $sOut $ctrl;
+    // back to round near the top of the next arc
+    if ($i < 4) {
+        int $mid = ($contact[$i] + $contact[$i + 1]) / 2;
+        setKeyframe -at scaleY -t $mid -v 1 $ctrl;
+        setKeyframe -at scaleX -t $mid -v 1 $ctrl;
+        setKeyframe -at scaleZ -t $mid -v 1 $ctrl;
+    }
+}
+setKeyframe -at scaleX -t 48 -v 1 $ctrl;
+setKeyframe -at scaleY -t 48 -v 1 $ctrl;
+setKeyframe -at scaleZ -t 48 -v 1 $ctrl;
+
+// ---- lights: a warm key from the front left and a cool sky fill ----
+string $sun = `directionalLight -n bbSun -i 0.6`;
+xform -ws -t -4 8 6 -ro -50 -30 0 $sun;
+setAttr ($sun + ".color") -type double3 1 0.93 0.82;
+setAttr ($sun + ".shadows") 1;
+string $sky = `skyDomeLight -n bbSky -i 0.2`;
+setAttr ($sky + ".color") -type double3 0.75 0.85 1;
+
+// ---- render camera: side-on view of the whole run ----
+string $cam[] = `camera -n bounceCam -fl 35`;
+xform -ws -t 0 2.3 11.5 -ro -3 0 0 $cam[0];
+setAttr ($cam[1] + ".coi") 11.5;
+
+group -n BouncingBall $floor[0] $wall[0] $ctrl $sun $sky $cam[0];
+select -cl;
+
+// @settings
+// high enough that the render camera's icon stays below the view
+xform -ws -t 0 5.5 15 -ro -12 0 0 persp;
+setAttr perspShape.focalLength 35;
+setAttr perspShape.coi 15.5;
+setAttr defaultRenderGlobals.renderer -type "string" "path";
+setAttr defaultRenderGlobals.camera -type "string" "bounceCam";
+setAttr defaultResolution.width 640;
+setAttr defaultResolution.height 360;
+setAttr defaultRenderGlobals.samples 192;
+setAttr defaultRenderGlobals.bounces 4;
+setAttr defaultRenderGlobals.toneMapping -type "string" "aces";
+playbackOptions -min 1 -max 48 -ast 1 -aet 48;
+currentTime 1;
